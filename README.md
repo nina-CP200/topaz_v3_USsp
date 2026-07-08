@@ -54,6 +54,12 @@ uv run python -m topaz_us.analysis.query --top 10
 uv run python -m topaz_us.analysis.query AAPL
 ```
 
+If Yahoo Finance returns rate-limit errors, configure a local proxy in `config/.env`:
+
+```bash
+TOPAZ_YF_PROXY=http://127.0.0.1:7897
+```
+
 ## Development
 
 For day-to-day development, use two terminals:

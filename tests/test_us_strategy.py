@@ -4,7 +4,7 @@ import unittest
 
 import pandas as pd
 
-from topaz_us.data.us_provider import _normalize_history
+from topaz_us.data.us_provider import _get_yfinance_proxy, _normalize_history
 from topaz_us.strategy import build_cross_section_features, get_advice_from_score, score_stock, suggest_position
 
 
@@ -54,6 +54,19 @@ class USStrategyTests(unittest.TestCase):
     def test_qqq_below_ma200_caps_buy_signal(self):
         self.assertEqual(get_advice_from_score(92, qqq_above_ma200=False), "可以关注")
         self.assertEqual(suggest_position(92, qqq_above_ma200=False), 0.0)
+
+    def test_yfinance_proxy_can_be_read_from_environment(self):
+        import os
+
+        old = os.environ.get("TOPAZ_YF_PROXY")
+        os.environ["TOPAZ_YF_PROXY"] = "http://127.0.0.1:7897"
+        try:
+            self.assertEqual(_get_yfinance_proxy(), "http://127.0.0.1:7897")
+        finally:
+            if old is None:
+                os.environ.pop("TOPAZ_YF_PROXY", None)
+            else:
+                os.environ["TOPAZ_YF_PROXY"] = old
 
 
 if __name__ == "__main__":

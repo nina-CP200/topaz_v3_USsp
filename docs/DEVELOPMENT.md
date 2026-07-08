@@ -62,7 +62,15 @@ make analyze    # Run NASDAQ 100 analysis and write data/raw/latest_analysis_res
 ./portfolio.sh  # Analyze saved portfolio data
 ```
 
-The analysis command depends on free Yahoo/yfinance access. If Yahoo rate-limits the machine, retry later or use existing cached parquet files under `data/raw/us_history`.
+The analysis command depends on free Yahoo/yfinance access. If Yahoo rate-limits the machine, retry later, use existing cached parquet files under `data/raw/us_history`, or configure an explicit proxy:
+
+```bash
+cp config/.env.example config/.env
+# edit config/.env
+TOPAZ_YF_PROXY=http://127.0.0.1:7897
+```
+
+`TOPAZ_YF_PROXY` is passed to `yfinance` with `yf.set_config(proxy=...)`. The app also respects `YFINANCE_PROXY`, `YF_PROXY`, `HTTPS_PROXY`, `HTTP_PROXY`, and `ALL_PROXY`.
 
 ## Adding Strategy Work
 

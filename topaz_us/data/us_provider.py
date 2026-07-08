@@ -10,6 +10,14 @@ import pandas as pd
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 RAW_DIR = PROJECT_ROOT / "data" / "raw"
 HISTORY_DIR = RAW_DIR / "us_history"
+PROXY_ENV_KEYS = (
+    "TOPAZ_YF_PROXY",
+    "YFINANCE_PROXY",
+    "YF_PROXY",
+    "HTTPS_PROXY",
+    "HTTP_PROXY",
+    "ALL_PROXY",
+)
 
 
 def normalize_symbol(symbol: str) -> str:
@@ -33,6 +41,34 @@ def load_us_stock_list(file_path: str | os.PathLike) -> List[Tuple[str, str, str
 
 def _cache_path(symbol: str) -> Path:
     return HISTORY_DIR / f"{normalize_symbol(symbol)}.parquet"
+
+
+def _read_env_file(path: Path) -> Dict[str, str]:
+    values: Dict[str, str] = {}
+    if not path.exists():
+        return values
+
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            value = value.strip().strip('"').strip("'")
+            values[key.strip()] = value
+    return values
+
+
+def _get_yfinance_proxy() -> str | None:
+    local_env = {}
+    local_env.update(_read_env_file(PROJECT_ROOT / ".env"))
+    local_env.update(_read_env_file(PROJECT_ROOT / "config" / ".env"))
+
+    for key in PROXY_ENV_KEYS:
+        value = os.environ.get(key) or local_env.get(key)
+        if value and value.lower() not in {"0", "false", "none", "off"}:
+            return value
+    return None
 
 
 def _normalize_history(df: pd.DataFrame, symbol: str) -> pd.DataFrame:
@@ -73,6 +109,10 @@ def _download_history(symbol: str, period: str = "2y", interval: str = "1d") -> 
     import yfinance as yf
 
     ticker = normalize_symbol(symbol)
+    proxy = _get_yfinance_proxy()
+    if proxy:
+        yf.set_config(proxy=proxy)
+
     df = yf.download(
         ticker,
         period=period,
@@ -167,4 +207,3 @@ def load_histories(
         if history is not None and len(history) >= 60:
             histories[normalize_symbol(symbol)] = history
     return histories
-
