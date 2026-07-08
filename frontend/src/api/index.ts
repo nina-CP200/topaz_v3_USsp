@@ -1,0 +1,191 @@
+import axios from 'axios'
+
+const api = axios.create({ baseURL: '/api' })
+
+export interface MarketOverview {
+  regime: string
+  regime_description: string
+  index_price: number
+  index_change_pct: number
+  index_high: number
+  index_low: number
+  index_open: number
+  index_prev_close: number
+  index_name: string
+  sentiment_advance_ratio: number
+  sentiment_up_count: number
+  sentiment_down_count: number
+  sentiment_limit_up: number
+  sentiment_limit_down: number
+  buy_threshold: number
+  sell_threshold: number
+  position_max: number
+  qqq_above_ma200?: boolean
+  qqq_ma20?: number
+  qqq_ma50?: number
+  qqq_ma200?: number
+}
+
+export interface KLineItem {
+  date: string
+  open: number
+  high: number
+  low: number
+  close: number
+  volume: number
+}
+
+export interface StockResult {
+  symbol: string
+  name: string
+  industry: string
+  sector: string
+  current_price: number
+  change_pct: number
+  probability: number
+  composite_score: number
+  reasons: string[]
+  advice: string
+  position_pct: number
+  model_confidence: number
+  rank: number
+  predicted_return: number
+  risk_level: string
+}
+
+export interface DailyAnalysis {
+  date: string
+  market_regime: string
+  model_confidence: number
+  advance_ratio: number
+  recommended_position: number
+  total_stocks: number
+  strategy_name?: string
+  benchmark?: string
+  market_description?: string
+  qqq_above_ma200?: boolean
+  results: StockResult[]
+}
+
+export interface HoldingItem {
+  symbol: string
+  name?: string
+  shares: number
+  cost: number
+}
+
+export interface HoldingAnalysis {
+  symbol: string
+  name: string
+  industry: string
+  shares: number
+  cost: number
+  current_price: number
+  market_value: number
+  pnl: number
+  pnl_pct: number
+  change_today: number
+  composite_score: number
+  advice: string
+  reasons: string[]
+  rsi: number
+  ret_5d: number
+  ret_20d: number
+}
+
+export interface PortfolioAnalysis {
+  holdings: HoldingAnalysis[]
+  failed?: { code: string; reason: string }[]
+  total_value: number
+  total_cost: number
+  total_pnl: number
+  total_pnl_pct: number
+  industry_allocation: Record<string, { value: number; pct: number; pnl: number; stocks: string[] }>
+  regime: string
+  buy_count: number
+  sell_count: number
+  loss_count: number
+}
+
+export async function getMarketOverview(): Promise<MarketOverview> {
+  const r = await api.get('/market/overview')
+  return r.data
+}
+
+export async function getMarketHistory(days = 60): Promise<{ data: KLineItem[] }> {
+  const r = await api.get('/market/history', { params: { days } })
+  return r.data
+}
+
+export async function getDailyAnalysis(): Promise<DailyAnalysis> {
+  const r = await api.get('/analysis/daily')
+  return r.data
+}
+
+export interface AnalysisReport {
+  text: string
+  error?: string
+}
+
+export async function getAnalysisReport(): Promise<AnalysisReport> {
+  const r = await api.get('/analysis/report')
+  return r.data
+}
+
+export interface SlackConfigItem {
+  name: string
+  token: string
+  channel: string
+}
+
+export async function listSlackConfigs(): Promise<{ configs: SlackConfigItem[] }> {
+  const r = await api.get('/settings/slack')
+  return r.data
+}
+
+export async function saveSlackConfigs(configs: SlackConfigItem[]): Promise<{ message: string }> {
+  const r = await api.put('/settings/slack', configs)
+  return r.data
+}
+
+export interface SendSlackResult {
+  message: string
+  errors?: string[]
+}
+
+export async function sendSlackReport(config?: string): Promise<SendSlackResult> {
+  const params = config ? { config } : {}
+  const r = await api.post('/analysis/send-slack', null, { params })
+  return r.data
+}
+
+export async function refreshAnalysis(): Promise<{ message: string }> {
+  const r = await api.post('/analysis/refresh')
+  return r.data
+}
+
+export interface AnalysisStatus {
+  status: string
+  progress: number
+  message: string
+}
+
+export async function getAnalysisStatus(): Promise<AnalysisStatus> {
+  const r = await api.get('/analysis/status')
+  return r.data
+}
+
+export async function getPortfolio(): Promise<{ holdings: HoldingItem[] }> {
+  const r = await api.get('/portfolio')
+  return r.data
+}
+
+export async function savePortfolio(holdings: HoldingItem[]): Promise<{ message: string; count: number }> {
+  const r = await api.put('/portfolio', { holdings })
+  return r.data
+}
+
+export async function analyzePortfolio(holdings: HoldingItem[]): Promise<PortfolioAnalysis> {
+  const r = await api.post('/portfolio/analyze', { holdings })
+  return r.data
+}
