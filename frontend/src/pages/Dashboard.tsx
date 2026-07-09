@@ -216,7 +216,7 @@ export default function Dashboard() {
             <Col span={24} className="fade-in-up stagger-3">
               <Card>
                 <Statistic
-                  title="Buy Score Threshold"
+                  title="Buy Signal Threshold"
                   value={overview?.buy_threshold?.toFixed(0)}
                   prefix={<RiseOutlined />}
                   valueStyle={{ color: 'var(--teal)' }}

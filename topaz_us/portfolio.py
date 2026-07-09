@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 from typing import Dict, List
 
@@ -8,6 +9,16 @@ from topaz_us.analysis.daily import DEFAULT_STOCK_LIST
 from topaz_us.data.regime import classify_qqq_regime
 from topaz_us.data.us_provider import get_history_data, load_us_stock_list
 from topaz_us.strategy import build_cross_section_features, get_advice_from_score, score_stock
+
+
+def _nullable_float(value, digits: int = 2):
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(number):
+        return None
+    return round(number, digits)
 
 
 def load_portfolio(file_path: str) -> List[Dict]:
@@ -64,7 +75,8 @@ def analyze_portfolio(portfolio: List[Dict]) -> Dict:
 
         row = feature_by_symbol[symbol]
         breakdown = score_stock(row)
-        advice = get_advice_from_score(breakdown.composite_score, qqq_above_ma200)
+        active_long_signal = bool(row.get("active_long_signal", False))
+        advice = get_advice_from_score(breakdown.composite_score, qqq_above_ma200, active_long_signal)
         current_price = float(row["current_price"])
         market_value = current_price * shares
         cost_value = cost * shares
@@ -85,6 +97,10 @@ def analyze_portfolio(portfolio: List[Dict]) -> Dict:
             "pnl_pct": round(pnl_pct, 2),
             "change_today": round(float(row["change_pct"]), 2),
             "composite_score": breakdown.composite_score,
+            "signal_status": "Active Long" if active_long_signal else "Sweep" if row.get("bullish_sweep") else "No Signal",
+            "entry_price": _nullable_float(row.get("entry_price")),
+            "stop_loss": _nullable_float(row.get("stop_loss")),
+            "tp1": _nullable_float(row.get("tp1")),
             "advice": advice,
             "reasons": breakdown.reasons,
             "rsi": 0,

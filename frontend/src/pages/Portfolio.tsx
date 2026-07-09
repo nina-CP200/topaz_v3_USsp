@@ -288,7 +288,7 @@ export default function Portfolio() {
                           </Col>
                           <Col span={4}>
                             <div style={{ color: 'var(--text-muted)', fontSize: 10, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>评分</div>
-                            <span className="data-value" style={{ color: 'var(--text-primary)' }}>{h.composite_score?.toFixed(3)}</span>
+                            <span className="data-value" style={{ color: 'var(--text-primary)' }}>{h.composite_score?.toFixed(1)}</span>
                           </Col>
                           <Col span={4}>
                             <div style={{ color: 'var(--text-muted)', fontSize: 10, fontFamily: 'var(--font-mono)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>现价</div>

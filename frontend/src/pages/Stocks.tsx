@@ -122,8 +122,11 @@ export default function Stocks() {
       ),
     },
     {
-      title: 'Quality', dataIndex: 'probability', key: 'probability', width: 80,
-      render: (v: number) => v == null ? '-' : <span className="data-value">{(v * 100).toFixed(1)}%</span>,
+      title: 'Signal', dataIndex: 'signal_status', key: 'signal_status', width: 92,
+      render: (v: string) => {
+        const color = v === 'Active Long' ? 'var(--teal)' : v === 'Sweep' ? 'var(--accent)' : 'var(--text-muted)'
+        return <span className="data-value" style={{ color }}>{v || 'No Signal'}</span>
+      },
     },
     {
       title: 'Score', dataIndex: 'composite_score', key: 'composite_score', width: 86,
@@ -153,6 +156,18 @@ export default function Stocks() {
       title: 'Position', dataIndex: 'position_pct', key: 'position_pct', width: 86,
       render: (v: number) => v ? <span className="data-value">{(v * 100).toFixed(0)}%</span> : '-',
     },
+    {
+      title: 'Entry', dataIndex: 'entry_price', key: 'entry_price', width: 76,
+      render: (v: number | null) => v ? <span className="data-value">{v.toFixed(2)}</span> : '-',
+    },
+    {
+      title: 'Stop', dataIndex: 'stop_loss', key: 'stop_loss', width: 76,
+      render: (v: number | null) => v ? <span className="data-value" style={{ color: 'var(--coral)' }}>{v.toFixed(2)}</span> : '-',
+    },
+    {
+      title: 'TP1', dataIndex: 'tp1', key: 'tp1', width: 76,
+      render: (v: number | null) => v ? <span className="data-value" style={{ color: 'var(--teal)' }}>{v.toFixed(2)}</span> : '-',
+    },
   ]
 
   return (
@@ -175,7 +190,7 @@ export default function Stocks() {
             fontFamily: 'var(--font-mono)',
             letterSpacing: '0.04em',
           }}>
-            正在分析 NASDAQ 100 成分股...
+            正在扫描 NASDAQ 100 liquidity sweep 入场信号...
           </div>
         </Card>
       )}
@@ -183,7 +198,7 @@ export default function Stocks() {
       {data && (
         <Row gutter={12} style={{ marginBottom: 16 }} className="fade-in-up stagger-1">
           <Col span={6}><Card size="small"><Statistic title="Market Regime" value={data.market_regime} /></Card></Col>
-          <Col span={6}><Card size="small"><Statistic title="Benchmark" value={data.benchmark || 'QQQ'} /></Card></Col>
+          <Col span={6}><Card size="small"><Statistic title="Strategy" value="Liquidity Sweeps" /></Card></Col>
           <Col span={6}><Card size="small"><Statistic title="Breadth" value={`${(data.advance_ratio * 100).toFixed(1)}%`} /></Card></Col>
           <Col span={6}><Card size="small"><Statistic title="分析日期" value={data.date} /></Card></Col>
         </Row>

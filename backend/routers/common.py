@@ -37,7 +37,11 @@ def patch_results(results: list, regime: str = "sideways", qqq_above_ma200: bool
         if "reasons" not in r:
             r["reasons"] = []
         if "position_pct" not in r:
-            r["position_pct"] = suggest_position(r.get("composite_score", 0), qqq_above_ma200)
+            r["position_pct"] = suggest_position(
+                r.get("composite_score", 0),
+                qqq_above_ma200,
+                bool(r.get("active_long_signal", False)),
+            )
         if "predicted_return" not in r:
             r["predicted_return"] = round((r.get("composite_score", 50) - 50) / 10, 2)
         if "risk_level" not in r:

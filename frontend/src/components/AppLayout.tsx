@@ -84,7 +84,7 @@ export default function AppLayout() {
               letterSpacing: '0.06em',
               textTransform: 'uppercase',
             }}>
-              TREND QUALITY
+              LIQUIDITY ENTRY
             </div>
           </div>
         </div>

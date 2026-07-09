@@ -44,6 +44,21 @@ export interface StockResult {
   change_pct: number
   probability: number
   composite_score: number
+  signal_status?: string
+  bullish_sweep?: boolean
+  bearish_sweep?: boolean
+  trend_filter?: boolean
+  volume_filter?: boolean
+  volatility_filter?: boolean
+  cooldown_pass?: boolean
+  active_long_signal?: boolean
+  entry_price?: number | null
+  stop_loss?: number | null
+  tp1?: number | null
+  tp2?: number | null
+  tp3?: number | null
+  atr_pct?: number
+  volume_ratio?: number
   reasons: string[]
   advice: string
   position_pct: number

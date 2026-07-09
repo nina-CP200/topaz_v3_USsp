@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 from datetime import datetime
 from pathlib import Path
@@ -23,6 +24,16 @@ DEFAULT_STOCK_LIST = PROJECT_ROOT / "config" / "nasdaq100_stocks.json"
 RESULT_FILE = PROJECT_ROOT / "data" / "raw" / "latest_analysis_results.json"
 
 
+def _nullable_float(value, digits: int = 2):
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(number):
+        return None
+    return round(number, digits)
+
+
 def analyze_stocks(stock_list_file: str | os.PathLike = DEFAULT_STOCK_LIST) -> Dict:
     stocks = load_us_stock_list(stock_list_file)
     symbols = [symbol for symbol, _, _ in stocks]
@@ -41,8 +52,9 @@ def analyze_stocks(stock_list_file: str | os.PathLike = DEFAULT_STOCK_LIST) -> D
         for _, row in features.iterrows():
             symbol = row["symbol"]
             breakdown = score_stock(row)
-            advice = get_advice_from_score(breakdown.composite_score, qqq_above_ma200)
-            position_pct = suggest_position(breakdown.composite_score, qqq_above_ma200)
+            active_long_signal = bool(row.get("active_long_signal", False))
+            advice = get_advice_from_score(breakdown.composite_score, qqq_above_ma200, active_long_signal)
+            position_pct = suggest_position(breakdown.composite_score, qqq_above_ma200, active_long_signal)
             results.append({
                 "symbol": symbol,
                 "name": meta.get(symbol, {}).get("name", symbol),
@@ -53,10 +65,28 @@ def analyze_stocks(stock_list_file: str | os.PathLike = DEFAULT_STOCK_LIST) -> D
                 "probability": round(breakdown.composite_score / 100, 4),
                 "composite_score": breakdown.composite_score,
                 "trend_score": breakdown.trend_score,
+                "signal_score": breakdown.signal_score,
+                "volume_score": breakdown.volume_score,
+                "volatility_score": breakdown.volatility_score,
                 "relative_strength_score": breakdown.relative_strength_score,
                 "momentum_score": breakdown.momentum_score,
                 "entry_score": breakdown.entry_score,
                 "risk_penalty": breakdown.risk_penalty,
+                "signal_status": "Active Long" if active_long_signal else "Sweep" if row.get("bullish_sweep") else "No Signal",
+                "bullish_sweep": bool(row.get("bullish_sweep", False)),
+                "bearish_sweep": bool(row.get("bearish_sweep", False)),
+                "trend_filter": bool(row.get("trend_filter", False)),
+                "volume_filter": bool(row.get("volume_filter", False)),
+                "volatility_filter": bool(row.get("volatility_filter", False)),
+                "cooldown_pass": bool(row.get("cooldown_pass", False)),
+                "active_long_signal": active_long_signal,
+                "entry_price": _nullable_float(row.get("entry_price")),
+                "stop_loss": _nullable_float(row.get("stop_loss")),
+                "tp1": _nullable_float(row.get("tp1")),
+                "tp2": _nullable_float(row.get("tp2")),
+                "tp3": _nullable_float(row.get("tp3")),
+                "atr_pct": round(float(row.get("atr_pct", 0)) * 100, 2),
+                "volume_ratio": round(float(row.get("volume_ratio", 0)), 2),
                 "advice": advice,
                 "reasons": breakdown.reasons,
                 "position_pct": position_pct,
@@ -88,7 +118,7 @@ def save_analysis_result(analysis_data: Dict, output_file: str | os.PathLike = R
     results = analysis_data.get("all_results", [])
     output_data = {
         "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
-        "strategy_name": "Topaz US Trend Quality",
+        "strategy_name": "Topaz US Liquidity Entry Signals",
         "benchmark": "QQQ",
         "market_regime": analysis_data.get("market_regime", "sideways"),
         "market_description": analysis_data.get("market_description", ""),
@@ -107,7 +137,7 @@ def save_analysis_result(analysis_data: Dict, output_file: str | os.PathLike = R
 
 def print_report(analysis_data: Dict):
     print("\n" + "=" * 80)
-    print("Topaz US Trend Quality")
+    print("Topaz US Liquidity Entry Signals")
     print("=" * 80)
     print(f"Report time: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
     print(f"Benchmark: QQQ | Regime: {analysis_data.get('market_regime')}")
@@ -122,7 +152,7 @@ def print_report(analysis_data: Dict):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Topaz US Trend Quality daily analysis")
+    parser = argparse.ArgumentParser(description="Topaz US Liquidity Entry Signals daily analysis")
     parser.add_argument("--stock-list", default=str(DEFAULT_STOCK_LIST))
     args = parser.parse_args()
 

@@ -11,7 +11,7 @@ topaz_us/                 Python domain package
   reports/                Slack report formatting
   utils/                  Small shared utilities
   portfolio.py            Portfolio analysis
-  strategy.py             Topaz US Trend Quality scoring
+  strategy.py             Liquidity sweep entry scoring
 backend/                  FastAPI app and routers
 frontend/                 React + Vite dashboard
 config/                   Static NASDAQ 100 universe

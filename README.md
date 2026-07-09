@@ -1,6 +1,6 @@
 # Topaz US
 
-Topaz US is a local FastAPI + React research dashboard for NASDAQ 100 daily trend-quality screening. The first version is long-only, uses free `yfinance` daily data, benchmarks market risk with `QQQ`, and does not use machine learning.
+Topaz US is a local FastAPI + React research dashboard for NASDAQ 100 daily liquidity-sweep entry scanning. The first version is long-only, uses free `yfinance` daily data, benchmarks market risk with `QQQ`, and does not use machine learning.
 
 ## Strategy
 
@@ -11,26 +11,33 @@ Topaz US is a local FastAPI + React research dashboard for NASDAQ 100 daily tren
 - Holding horizon: several days to several weeks
 - Direction: long-only
 
-The strategy name is `Topaz US Trend Quality`.
+The strategy name is `Topaz US Liquidity Entry Signals`.
 
 Each stock receives:
 
-- `trend_score`: price above MA20/MA50/MA200 plus MA20 > MA50 and MA50 > MA200
-- `relative_strength_score`: 20-day and 60-day returns versus `QQQ`
-- `momentum_score`: 20-day, 60-day, and 120-day cross-sectional momentum
-- `entry_score`: constructive pullback near MA20, MA20 reclaim, 20-day breakout, or bullish liquidity sweep
-- `risk_penalty`: high 20-day volatility, overextension above MA20, or deep recent drawdown
+- `bullish_sweep`: today low pierces the prior 20-day structure low, then closes back above that structure low with close > open
+- `trend_filter`: close is above SMA50
+- `volume_filter`: volume is above 20-day average volume by a small confirmation factor
+- `volatility_filter`: ATR as a percent of price is neither too quiet nor too wide
+- `cooldown_pass`: avoids repeated signals in the same ticker within a short window
+- `risk_penalty`: bearish sweep or excessive ATR risk
 
-`composite_score` is normalized to `0-100`.
+When a bullish sweep is present, the system calculates:
+
+- `entry_price`: signal close
+- `stop_loss`: entry minus ATR x 1.5
+- `tp1/tp2/tp3`: 1R / 2R / 3R targets
+
+`composite_score` is normalized to `0-100`. Active buy signals require the sweep and all filters to pass. If `QQQ` is below MA200, the system will not produce active buy signals.
 
 Advice rules:
 
-- `>= 75`: 建议买入
-- `65-75`: 可以关注
-- `50-65`: 建议观望
-- `< 50`: 建议回避
+- Active signal and score `>= 85`: 建议买入
+- Active signal below buy threshold or score `>= 65`: 可以关注
+- `35-65`: 建议观望
+- `< 35`: 建议回避
 
-Single-stock position cap is `8%`. If `QQQ` is below MA200, the system will not produce active buy signals.
+Single-stock position cap is `8%`.
 
 ## Run
 
