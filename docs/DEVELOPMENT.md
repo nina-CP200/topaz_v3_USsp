@@ -11,7 +11,7 @@ topaz_us/                 Python domain package
   reports/                Slack report formatting
   utils/                  Small shared utilities
   portfolio.py            Portfolio analysis
-  strategy.py             Liquidity sweep entry scoring
+  strategy.py             Moon accumulation entry and liquidity exit scoring
 backend/                  FastAPI app and routers
 frontend/                 React + Vite dashboard
 config/                   Static NASDAQ 100 universe
@@ -75,6 +75,8 @@ TOPAZ_YF_PROXY=http://127.0.0.1:7897
 ## Adding Strategy Work
 
 Most scoring changes belong in `topaz_us/strategy.py`.
+
+The shared `build_signal_frame()` function is the source of truth for daily analysis and the Moon/liquidity backtest. Keep new entry or exit rules there so the dashboard and research results cannot silently drift apart.
 
 Keep these contracts stable unless the frontend and API schemas are updated together:
 

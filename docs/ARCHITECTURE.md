@@ -10,7 +10,7 @@ Key files:
 
 - `topaz_us/data/us_provider.py`: fetches and normalizes yfinance OHLCV data, then caches parquet files.
 - `topaz_us/data/regime.py`: classifies QQQ market state and MA200 risk filter.
-- `topaz_us/strategy.py`: scans bullish liquidity sweeps, applies trend/volume/ATR/cooldown filters, and calculates entry, stop, targets, advice, and position sizing.
+- `topaz_us/strategy.py`: scans Moon accumulation pullbacks and expansion breakouts, then applies liquidity-sweep exit warnings, ATR protection, advice, and position sizing.
 - `topaz_us/analysis/daily.py`: orchestrates a full NASDAQ 100 run and writes latest results.
 
 ## 2. API Layer
@@ -49,7 +49,7 @@ topaz_us.analysis.daily
         |
         +-- yfinance -> data/raw/us_history/*.parquet
         |
-        +-- topaz_us.strategy liquidity sweep scoring
+        +-- topaz_us.strategy Moon entry / liquidity exit scoring
         |
         v
 data/raw/latest_analysis_results.json

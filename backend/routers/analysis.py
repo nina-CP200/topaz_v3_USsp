@@ -72,7 +72,7 @@ def analysis_report():
     regime_name = regime_names.get(regime, regime)
 
     lines = []
-    lines.append("Topaz US Liquidity Entry Signals Daily Report")
+    lines.append("Topaz US Moon Accumulation + Liquidity Exit Daily Report")
     lines.append(f"⏱ {date}")
     lines.append("")
     lines.append(f"Market: {regime_name} | Benchmark: QQQ | Coverage breadth: {adv_ratio:.1%}")
@@ -93,8 +93,8 @@ def analysis_report():
             pos = s.get("position_pct", 0)
             lines.append(f"  #{i} {s['symbol']} {s['name']} ({s.get('sector', s.get('industry', ''))})")
             lines.append(f"     Score: {score:.1f} | Position: {pos:.0%} | {adv}")
-            if s.get("entry_price") and s.get("stop_loss") and s.get("tp1"):
-                lines.append(f"     Entry: {s['entry_price']:.2f} | Stop: {s['stop_loss']:.2f} | TP1: {s['tp1']:.2f}")
+            if s.get("entry_price") and s.get("stop_loss"):
+                lines.append(f"     Entry: {s['entry_price']:.2f} | Initial stop: {s['stop_loss']:.2f}")
             if rsn:
                 lines.append(f"     Reasons: {rsn}")
         lines.append("")
@@ -227,7 +227,7 @@ def _run_analysis():
             "model_confidence": result.get("model_confidence", 0.5),
             "advance_ratio": result.get("advance_ratio", 0.5),
             "recommended_position": result.get("recommended_position", 0.5),
-            "strategy_name": "Topaz US Liquidity Entry Signals",
+            "strategy_name": "Topaz US Moon Accumulation + Liquidity Exit",
             "benchmark": "QQQ",
             "market_description": result.get("market_description", ""),
             "qqq_above_ma200": result.get("qqq_above_ma200", False),

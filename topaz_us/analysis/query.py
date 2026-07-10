@@ -41,7 +41,7 @@ def query_stock(stock_code: str) -> None:
     print("Topaz US Stock Query")
     print("=" * 60)
     print(f"Analysis date: {data.get('date', 'unknown')}")
-    print(f"Strategy: {data.get('strategy_name', 'Topaz US Liquidity Entry Signals')}")
+    print(f"Strategy: {data.get('strategy_name', 'Topaz US Moon Accumulation + Liquidity Exit')}")
     print(f"Market regime: {data.get('market_regime', 'unknown')}")
     print()
     print(f"Name: {stock.get('name', normalized_code)}")

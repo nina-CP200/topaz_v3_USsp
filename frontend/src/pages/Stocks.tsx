@@ -190,7 +190,7 @@ export default function Stocks() {
             fontFamily: 'var(--font-mono)',
             letterSpacing: '0.04em',
           }}>
-            正在扫描 NASDAQ 100 liquidity sweep 入场信号...
+            正在扫描 NASDAQ 100 回调吸筹与突破入场信号...
           </div>
         </Card>
       )}
@@ -198,7 +198,7 @@ export default function Stocks() {
       {data && (
         <Row gutter={12} style={{ marginBottom: 16 }} className="fade-in-up stagger-1">
           <Col span={6}><Card size="small"><Statistic title="Market Regime" value={data.market_regime} /></Card></Col>
-          <Col span={6}><Card size="small"><Statistic title="Strategy" value="Liquidity Sweeps" /></Card></Col>
+          <Col span={6}><Card size="small"><Statistic title="Strategy" value="Moon + Liquidity Exit" /></Card></Col>
           <Col span={6}><Card size="small"><Statistic title="Breadth" value={`${(data.advance_ratio * 100).toFixed(1)}%`} /></Card></Col>
           <Col span={6}><Card size="small"><Statistic title="分析日期" value={data.date} /></Card></Col>
         </Row>

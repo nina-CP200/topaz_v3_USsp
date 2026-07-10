@@ -84,7 +84,7 @@ export default function AppLayout() {
               letterSpacing: '0.06em',
               textTransform: 'uppercase',
             }}>
-              LIQUIDITY ENTRY
+              MOON ACCUMULATION
             </div>
           </div>
         </div>

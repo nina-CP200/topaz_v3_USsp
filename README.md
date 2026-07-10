@@ -1,6 +1,6 @@
 # Topaz US
 
-Topaz US is a local FastAPI + React research dashboard for NASDAQ 100 daily liquidity-sweep entry scanning. The first version is long-only, uses free `yfinance` daily data, benchmarks market risk with `QQQ`, and does not use machine learning.
+Topaz US is a local FastAPI + React research dashboard for NASDAQ 100 daily trend-pullback and breakout scanning. The first version is long-only, uses free `yfinance` daily data, benchmarks market risk with `QQQ`, and does not use machine learning.
 
 ## Strategy
 
@@ -11,24 +11,24 @@ Topaz US is a local FastAPI + React research dashboard for NASDAQ 100 daily liqu
 - Holding horizon: several days to several weeks
 - Direction: long-only
 
-The strategy name is `Topaz US Liquidity Entry Signals`.
+The strategy name is `Topaz US Moon Accumulation + Liquidity Exit`.
 
 Each stock receives:
 
-- `bullish_sweep`: today low pierces the prior 20-day structure low, then closes back above that structure low with close > open
-- `trend_filter`: close is above SMA50
-- `volume_filter`: volume is above 20-day average volume by a small confirmation factor
-- `volatility_filter`: ATR as a percent of price is neither too quiet nor too wide
-- `cooldown_pass`: avoids repeated signals in the same ticker within a short window
-- `risk_penalty`: bearish sweep or excessive ATR risk
+- `accumulation_entry`: a measured pullback into the 21-period TMA zone while 50-day structure remains intact and repair momentum improves
+- `expansion_add_entry`: a volume-backed close above the prior 30-day high with 21/55/144 TMA bullish alignment
+- `moon_buy_signal`: a setup onset, emitted only once rather than on every bar that stays in the same zone
+- `bearish_sweep`: a failed upside liquidity sweep, used as an exit warning
+- `risk_penalty`: bearish sweep, excessive ATR, or extension pressure
 
-When a bullish sweep is present, the system calculates:
+When a Moon buy signal is present, the system calculates:
 
 - `entry_price`: signal close
 - `stop_loss`: entry minus ATR x 1.5
-- `tp1/tp2/tp3`: 1R / 2R / 3R targets
 
-`composite_score` is normalized to `0-100`. Active buy signals require the sweep and all filters to pass. If `QQQ` is below MA200, the system will not produce active buy signals.
+There are no fixed profit targets. The strategy holds until a bearish liquidity sweep, the initial ATR stop, or portfolio-level discretion.
+
+`composite_score` is normalized to `0-100`. Active buy signals require an accumulation or expansion setup. If `QQQ` is below MA200, the system will not produce active buy signals.
 
 Advice rules:
 
@@ -52,6 +52,7 @@ Run analysis from the command line:
 
 ```bash
 uv run python -m topaz_us.analysis.daily
+uv run python -m topaz_us.backtest.moon_liquidity --days 500 --max-holding-days 40
 ```
 
 Query the latest results:

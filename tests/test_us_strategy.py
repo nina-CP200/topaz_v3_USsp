@@ -22,14 +22,24 @@ def make_history(start: float, step: float, days: int = 260, symbol: str = "TEST
     })
 
 
-def make_bullish_sweep_history(symbol: str = "SWEEP") -> pd.DataFrame:
-    history = make_history(100, 0.12, days=90, symbol=symbol)
-    structure_low = history["low"].shift(1).rolling(20).min().iloc[-1]
-    history.loc[history.index[-1], "open"] = structure_low + 0.10
-    history.loc[history.index[-1], "low"] = structure_low - 0.50
-    history.loc[history.index[-1], "close"] = structure_low + 1.25
-    history.loc[history.index[-1], "high"] = structure_low + 1.80
-    history.loc[history.index[-1], "volume"] = 2_000_000
+def make_accumulation_history(symbol: str = "ACCUM") -> pd.DataFrame:
+    history = make_history(100, 0.40, days=260, symbol=symbol)
+    # A measured pullback inside a long-running trend: below the fast TMA,
+    # while the medium/slow trend and 50-day structure remain intact.
+    for offset in range(8, 0, -1):
+        index = history.index[-offset]
+        previous_close = history.loc[index - 1, "close"]
+        close = previous_close + (0.50 if offset == 1 else -1.0)
+        history.loc[index, ["open", "high", "low", "close"]] = [
+            close + 0.25,
+            close + 0.50,
+            close - 0.50,
+            close,
+        ]
+    # The prior bar breaks structure; the final bullish repair creates the
+    # first valid setup rather than continuing an already-active zone.
+    prior_index = history.index[-2]
+    history.loc[prior_index, ["open", "high", "low", "close"]] = [180.5, 181.0, 179.5, 180.0]
     return history
 
 
@@ -48,21 +58,21 @@ class USStrategyTests(unittest.TestCase):
         self.assertEqual(normalized.iloc[-1]["symbol"], "AAPL")
         self.assertEqual(float(normalized.iloc[-1]["close"]), 12.5)
 
-    def test_bullish_sweep_with_filters_scores_as_entry_signal(self):
+    def test_accumulation_setup_scores_as_entry_signal(self):
         benchmark = make_history(100, 0.10, symbol="QQQ")
-        sweep = make_bullish_sweep_history()
-        quiet = make_history(100, 0.05, symbol="QUIET")
+        accumulation = make_accumulation_history()
+        quiet = make_history(100, 0.05, days=260, symbol="QUIET")
 
-        features = build_cross_section_features({"SWEEP": sweep, "QUIET": quiet}, benchmark)
+        features = build_cross_section_features({"ACCUM": accumulation, "QUIET": quiet}, benchmark)
         rows = {row["symbol"]: row for _, row in features.iterrows()}
-        sweep_score = score_stock(rows["SWEEP"]).composite_score
+        accumulation_score = score_stock(rows["ACCUM"]).composite_score
         quiet_score = score_stock(rows["QUIET"]).composite_score
 
-        self.assertTrue(rows["SWEEP"]["bullish_sweep"])
-        self.assertTrue(rows["SWEEP"]["active_long_signal"])
-        self.assertGreaterEqual(sweep_score, 85)
+        self.assertTrue(rows["ACCUM"]["accumulation_entry"])
+        self.assertTrue(rows["ACCUM"]["active_long_signal"])
+        self.assertGreaterEqual(accumulation_score, 85)
         self.assertLess(quiet_score, 35)
-        self.assertGreater(sweep_score, quiet_score)
+        self.assertGreater(accumulation_score, quiet_score)
 
     def test_qqq_below_ma200_caps_buy_signal(self):
         self.assertEqual(get_advice_from_score(92, qqq_above_ma200=False, active_long_signal=True), "可以关注")

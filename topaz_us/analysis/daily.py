@@ -72,7 +72,7 @@ def analyze_stocks(stock_list_file: str | os.PathLike = DEFAULT_STOCK_LIST) -> D
                 "momentum_score": breakdown.momentum_score,
                 "entry_score": breakdown.entry_score,
                 "risk_penalty": breakdown.risk_penalty,
-                "signal_status": "Active Long" if active_long_signal else "Sweep" if row.get("bullish_sweep") else "No Signal",
+                "signal_status": "Active Long" if active_long_signal else "Exit Warning" if row.get("bearish_sweep") else "No Signal",
                 "bullish_sweep": bool(row.get("bullish_sweep", False)),
                 "bearish_sweep": bool(row.get("bearish_sweep", False)),
                 "trend_filter": bool(row.get("trend_filter", False)),
@@ -118,7 +118,7 @@ def save_analysis_result(analysis_data: Dict, output_file: str | os.PathLike = R
     results = analysis_data.get("all_results", [])
     output_data = {
         "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
-        "strategy_name": "Topaz US Liquidity Entry Signals",
+        "strategy_name": "Topaz US Moon Accumulation + Liquidity Exit",
         "benchmark": "QQQ",
         "market_regime": analysis_data.get("market_regime", "sideways"),
         "market_description": analysis_data.get("market_description", ""),
@@ -137,7 +137,7 @@ def save_analysis_result(analysis_data: Dict, output_file: str | os.PathLike = R
 
 def print_report(analysis_data: Dict):
     print("\n" + "=" * 80)
-    print("Topaz US Liquidity Entry Signals")
+    print("Topaz US Moon Accumulation + Liquidity Exit")
     print("=" * 80)
     print(f"Report time: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
     print(f"Benchmark: QQQ | Regime: {analysis_data.get('market_regime')}")
@@ -152,7 +152,7 @@ def print_report(analysis_data: Dict):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Topaz US Liquidity Entry Signals daily analysis")
+    parser = argparse.ArgumentParser(description="Topaz US Moon Accumulation + Liquidity Exit daily analysis")
     parser.add_argument("--stock-list", default=str(DEFAULT_STOCK_LIST))
     args = parser.parse_args()
 
