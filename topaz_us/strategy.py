@@ -101,6 +101,7 @@ def build_signal_frame(history: pd.DataFrame) -> pd.DataFrame:
     di_plus, di_minus, adx = _dmi(frame)
 
     frame["atr"] = atr
+    frame["ret_20"] = close.pct_change(20)
     frame["fast_tma"] = fast_tma
     frame["medium_tma"] = medium_tma
     frame["slow_tma"] = slow_tma

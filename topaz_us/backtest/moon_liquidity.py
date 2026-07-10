@@ -11,7 +11,14 @@ import pandas as pd
 
 from topaz_us.backtest.liquidity import _benchmark_return, _prepare_benchmark, summarize_trades
 from topaz_us.data.us_provider import PROJECT_ROOT, get_history_data, get_index_history, load_us_stock_list
-from topaz_us.strategy import ATR_MULTIPLIER, SLOW_TMA_LENGTH, build_signal_frame
+from topaz_us.strategy import (
+    ATR_MULTIPLIER,
+    MAX_ATR_PCT,
+    MIN_ATR_PCT,
+    SLOW_TMA_LENGTH,
+    VOLUME_MULTIPLIER,
+    build_signal_frame,
+)
 
 
 DEFAULT_STOCK_LIST = PROJECT_ROOT / "config" / "nasdaq100_stocks.json"
@@ -22,6 +29,17 @@ COMMISSION_RATE = 0.0006
 class BacktestConfig:
     days: int = 500
     max_holding_days: int = 40
+    max_symbols: int | None = None
+    use_cache: bool = True
+
+
+@dataclass(frozen=True)
+class PortfolioBacktestConfig:
+    days: int = 500
+    max_holding_days: int = 40
+    max_positions: int = 10
+    position_size_pct: float = 0.08
+    initial_capital: float = 100_000.0
     max_symbols: int | None = None
     use_cache: bool = True
 
@@ -40,6 +58,19 @@ class Trade:
     holding_days: int
     exit_reason: str
     entry_setup: str
+
+
+@dataclass
+class OpenPosition:
+    symbol: str
+    signal_date: pd.Timestamp
+    entry_date: pd.Timestamp
+    entry_price: float
+    shares: float
+    stop_loss: float
+    entry_setup: str
+    entry_score: float
+    signal_index: int
 
 
 def _prepare_history(history: pd.DataFrame) -> pd.DataFrame:
@@ -172,6 +203,198 @@ def run_backtest(config: BacktestConfig, stock_list_file: str | Path = DEFAULT_S
     summary["symbols_tested"] = len(stocks) - len(skipped)
     summary["symbols_skipped"] = skipped
     summary["config"] = asdict(config)
+    return {"summary": summary, "trades": [asdict(trade) for trade in trades]}
+
+
+def _portfolio_entry_score(row: pd.Series) -> float:
+    score = 60.0 if bool(row["accumulation_entry"]) else 55.0
+    if bool(row["bull_order"]):
+        score += 15.0
+    volume_ratio = float(row["volume_ratio"]) if pd.notna(row["volume_ratio"]) else 0.0
+    if volume_ratio >= VOLUME_MULTIPLIER:
+        score += 10.0
+    elif volume_ratio >= 1.0:
+        score += 5.0
+    atr_pct = float(row["atr"] / row["close"]) if row["close"] and pd.notna(row["atr"]) else 0.0
+    if MIN_ATR_PCT <= atr_pct <= MAX_ATR_PCT:
+        score += 10.0
+    if float(row["repair_pressure"]) >= 80:
+        score -= 15.0
+    # Break ties with continuous measurements rather than ticker order.
+    atr = float(row["atr"]) if pd.notna(row["atr"]) else 0.0
+    tma_spread = (float(row["fast_tma"]) - float(row["medium_tma"])) / atr if atr else 0.0
+    score += min(6.0, max(0.0, tma_spread))
+    score += min(5.0, max(0.0, float(row["ret_20"]) * 100) * 0.25) if pd.notna(row["ret_20"]) else 0.0
+    score += min(4.0, max(0.0, volume_ratio - 1.0) * 2.0)
+    score += min(4.0, max(0.0, float(row["repair_progress"]) - 60.0) * 0.10)
+    return max(0.0, score)
+
+
+def run_portfolio_backtest(
+    config: PortfolioBacktestConfig,
+    stock_list_file: str | Path = DEFAULT_STOCK_LIST,
+) -> dict:
+    """Simulate a capped, equal-weight portfolio of the daily QQQ candidates."""
+    if config.max_positions < 1 or not 0 < config.position_size_pct <= 1 or config.initial_capital <= 0:
+        raise ValueError("Portfolio sizing parameters must be positive.")
+
+    stocks = load_us_stock_list(stock_list_file)
+    if config.max_symbols:
+        stocks = stocks[: config.max_symbols]
+    benchmark_history = get_index_history("QQQ", days=config.days)
+    if benchmark_history is None or len(benchmark_history) < 220:
+        raise RuntimeError("QQQ history is too short for the MA200 market filter.")
+    qqq_above_ma200 = _prepare_benchmark(benchmark_history)
+
+    frames: dict[str, pd.DataFrame] = {}
+    skipped: list[str] = []
+    for symbol, _, _ in stocks:
+        history = get_history_data(symbol, days=config.days, use_cache=config.use_cache)
+        if history is None or len(history) < 220:
+            skipped.append(symbol)
+            continue
+        frames[symbol] = _prepare_history(history)
+
+    candidates_by_date: dict[pd.Timestamp, list[tuple[float, str, int]]] = {}
+    for symbol, frame in frames.items():
+        for index in range(max(200, SLOW_TMA_LENGTH), len(frame) - 1):
+            signal = frame.iloc[index]
+            signal_date = pd.Timestamp(signal["date"]).normalize()
+            if not bool(qqq_above_ma200.get(signal_date, False)) or not bool(signal["moon_buy_signal"]):
+                continue
+            entry_date = pd.Timestamp(frame.iloc[index + 1]["date"]).normalize()
+            candidates_by_date.setdefault(entry_date, []).append((_portfolio_entry_score(signal), symbol, index))
+
+    benchmark_dates = pd.to_datetime(benchmark_history["date"]).dt.tz_localize(None).dt.normalize()
+    cash = float(config.initial_capital)
+    positions: dict[str, OpenPosition] = {}
+    pending_exits: dict[pd.Timestamp, set[str]] = {}
+    trades: list[Trade] = []
+    equity_curve: list[tuple[pd.Timestamp, float]] = []
+    exposure_samples: list[float] = []
+    max_positions_used = 0
+    candidates_considered = 0
+    candidates_rejected_capacity = 0
+
+    def close_position(position: OpenPosition, date: pd.Timestamp, price: float, reason: str) -> None:
+        nonlocal cash
+        proceeds = position.shares * price * (1 - COMMISSION_RATE)
+        cash += proceeds
+        return_pct = (((price * (1 - COMMISSION_RATE)) / (position.entry_price * (1 + COMMISSION_RATE))) - 1) * 100
+        trades.append(Trade(
+            symbol=position.symbol,
+            signal_date=str(position.signal_date.date()),
+            entry_date=str(position.entry_date.date()),
+            exit_date=str(date.date()),
+            entry_price=round(position.entry_price, 4),
+            exit_price=round(price, 4),
+            stop_loss=round(position.stop_loss, 4),
+            target_price=None,
+            return_pct=round(float(return_pct), 4),
+            holding_days=int((date - position.signal_date).days),
+            exit_reason=reason,
+            entry_setup=position.entry_setup,
+        ))
+        positions.pop(position.symbol, None)
+
+    for date in benchmark_dates:
+        bars = {
+            symbol: frame.loc[frame["date"] == date].iloc[0]
+            for symbol, frame in frames.items()
+            if (frame["date"] == date).any()
+        }
+
+        for symbol in pending_exits.pop(date, set()):
+            position = positions.get(symbol)
+            bar = bars.get(symbol)
+            if position is not None and bar is not None:
+                close_position(position, date, float(bar["open"]), "bearish_liquidity_sweep")
+
+        equity_at_open = cash + sum(position.shares * float(bars[position.symbol]["open"]) for position in positions.values() if position.symbol in bars)
+        daily_candidates = sorted(candidates_by_date.get(date, []), reverse=True)
+        candidates_considered += len(daily_candidates)
+        for score, symbol, signal_index in daily_candidates:
+            if symbol in positions:
+                continue
+            if len(positions) >= config.max_positions:
+                candidates_rejected_capacity += 1
+                continue
+            bar = bars.get(symbol)
+            if bar is None:
+                continue
+            allocation = min(equity_at_open * config.position_size_pct, cash)
+            entry_price = float(bar["open"])
+            if allocation <= 0 or entry_price <= 0:
+                continue
+            shares = allocation / (entry_price * (1 + COMMISSION_RATE))
+            cash -= shares * entry_price * (1 + COMMISSION_RATE)
+            signal = frames[symbol].iloc[signal_index]
+            entry_setup = "accumulation" if bool(signal["accumulation_entry"]) else "expansion_breakout"
+            positions[symbol] = OpenPosition(
+                symbol=symbol,
+                signal_date=pd.Timestamp(signal["date"]).normalize(),
+                entry_date=date,
+                entry_price=entry_price,
+                shares=shares,
+                stop_loss=float(signal["close"] - signal["atr"] * ATR_MULTIPLIER),
+                entry_setup=entry_setup,
+                entry_score=score,
+                signal_index=signal_index,
+            )
+
+        for symbol, position in list(positions.items()):
+            bar = bars.get(symbol)
+            if bar is not None and float(bar["low"]) <= position.stop_loss:
+                close_position(position, date, min(float(bar["open"]), position.stop_loss), "atr_stop")
+
+        for symbol, position in list(positions.items()):
+            bar = bars.get(symbol)
+            if bar is None:
+                continue
+            symbol_frame = frames[symbol]
+            row_indexes = symbol_frame.index[symbol_frame["date"] == date]
+            if len(row_indexes) == 0:
+                continue
+            current_index = int(row_indexes[0])
+            if current_index - position.signal_index >= config.max_holding_days:
+                close_position(position, date, float(bar["close"]), "time_exit")
+            elif bool(bar["bearish_sweep"]) and current_index + 1 < len(symbol_frame):
+                exit_date = pd.Timestamp(symbol_frame.iloc[current_index + 1]["date"]).normalize()
+                pending_exits.setdefault(exit_date, set()).add(symbol)
+
+        mark_to_market = cash + sum(position.shares * float(bars[position.symbol]["close"]) for position in positions.values() if position.symbol in bars)
+        equity_curve.append((date, mark_to_market))
+        exposure_samples.append((mark_to_market - cash) / mark_to_market if mark_to_market else 0.0)
+        max_positions_used = max(max_positions_used, len(positions))
+
+    final_date = benchmark_dates.iloc[-1]
+    final_bars = {
+        symbol: frame.loc[frame["date"] == final_date].iloc[0]
+        for symbol, frame in frames.items()
+        if (frame["date"] == final_date).any()
+    }
+    for symbol, position in list(positions.items()):
+        bar = final_bars.get(symbol)
+        if bar is not None:
+            close_position(position, final_date, float(bar["close"]), "end_of_sample")
+
+    equity = pd.Series([value for _, value in equity_curve], dtype=float)
+    drawdown = equity / equity.cummax() - 1
+    summary = summarize_moon_trades(trades, benchmark_history)
+    summary.update({
+        "measurement": "Daily marked-to-market portfolio equity curve.",
+        "portfolio_return_pct": round((cash / config.initial_capital - 1) * 100, 2),
+        "portfolio_max_drawdown_pct": round(float(drawdown.min() * 100), 2),
+        "final_equity": round(cash, 2),
+        "average_invested_pct": round(float(np.mean(exposure_samples) * 100), 2),
+        "max_positions_used": max_positions_used,
+        "candidates_considered": candidates_considered,
+        "candidates_rejected_capacity": candidates_rejected_capacity,
+        "symbols_tested": len(frames),
+        "symbols_skipped": skipped,
+        "survivorship_bias_note": "Uses the current static NASDAQ 100/QQQ-like universe for the full period.",
+        "config": asdict(config),
+    })
     return {"summary": summary, "trades": [asdict(trade) for trade in trades]}
 
 
