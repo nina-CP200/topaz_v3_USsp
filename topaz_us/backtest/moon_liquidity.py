@@ -426,6 +426,36 @@ def run_portfolio_backtest(
             "qqq_above_ma200_dates": allowed_dates,
             "reason": "QQQ below MA200" if blocked_days / len(active_period) >= 0.8 else "No open qualifying positions",
         })
+
+    low_exposure_periods: list[dict] = []
+    active_period = []
+    for state in daily_states:
+        is_low_exposure = state["qqq_ma200_ready"] and state["invested_pct"] < 0.35
+        if is_low_exposure:
+            active_period.append(state)
+        elif active_period:
+            blocked_days = sum(not item["qqq_above_ma200"] for item in active_period)
+            exposures = [item["invested_pct"] * 100 for item in active_period]
+            low_exposure_periods.append({
+                "start": str(active_period[0]["date"].date()),
+                "end": str(active_period[-1]["date"].date()),
+                "trading_days": len(active_period),
+                "average_invested_pct": round(float(np.mean(exposures)), 2),
+                "min_invested_pct": round(float(min(exposures)), 2),
+                "qqq_below_ma200_days": blocked_days,
+            })
+            active_period = []
+    if active_period:
+        blocked_days = sum(not item["qqq_above_ma200"] for item in active_period)
+        exposures = [item["invested_pct"] * 100 for item in active_period]
+        low_exposure_periods.append({
+            "start": str(active_period[0]["date"].date()),
+            "end": str(active_period[-1]["date"].date()),
+            "trading_days": len(active_period),
+            "average_invested_pct": round(float(np.mean(exposures)), 2),
+            "min_invested_pct": round(float(min(exposures)), 2),
+            "qqq_below_ma200_days": blocked_days,
+        })
     summary = summarize_moon_trades(trades, benchmark_history)
     summary.update({
         "measurement": "Daily marked-to-market portfolio equity curve.",
@@ -437,12 +467,26 @@ def run_portfolio_backtest(
         "candidates_considered": candidates_considered,
         "candidates_rejected_capacity": candidates_rejected_capacity,
         "flat_periods": flat_periods,
+        "low_exposure_periods": low_exposure_periods,
         "symbols_tested": len(frames),
         "symbols_skipped": skipped,
         "survivorship_bias_note": "Uses the current static NASDAQ 100/QQQ-like universe for the full period.",
         "config": asdict(config),
     })
-    return {"summary": summary, "trades": [asdict(trade) for trade in trades]}
+    return {
+        "summary": summary,
+        "trades": [asdict(trade) for trade in trades],
+        "daily_exposure": [
+            {
+                "date": str(state["date"].date()),
+                "holdings": state["holdings"],
+                "invested_pct": round(state["invested_pct"] * 100, 2),
+                "qqq_ma200_ready": state["qqq_ma200_ready"],
+                "qqq_above_ma200": state["qqq_above_ma200"],
+            }
+            for state in daily_states
+        ],
+    }
 
 
 def main() -> None:
