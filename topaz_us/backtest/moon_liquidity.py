@@ -245,6 +245,10 @@ def run_portfolio_backtest(
     if benchmark_history is None or len(benchmark_history) < 220:
         raise RuntimeError("QQQ history is too short for the MA200 market filter.")
     qqq_above_ma200 = _prepare_benchmark(benchmark_history)
+    benchmark_frame = benchmark_history.copy().sort_values("date").reset_index(drop=True)
+    benchmark_frame["date"] = pd.to_datetime(benchmark_frame["date"]).dt.tz_localize(None).dt.normalize()
+    benchmark_frame["ma200"] = benchmark_frame["close"].rolling(200).mean()
+    qqq_ma_ready = pd.Series(benchmark_frame["ma200"].notna().to_numpy(), index=benchmark_frame["date"])
 
     frames: dict[str, pd.DataFrame] = {}
     skipped: list[str] = []
@@ -272,6 +276,7 @@ def run_portfolio_backtest(
     trades: list[Trade] = []
     equity_curve: list[tuple[pd.Timestamp, float]] = []
     exposure_samples: list[float] = []
+    daily_states: list[dict] = []
     max_positions_used = 0
     candidates_considered = 0
     candidates_rejected_capacity = 0
@@ -364,7 +369,15 @@ def run_portfolio_backtest(
 
         mark_to_market = cash + sum(position.shares * float(bars[position.symbol]["close"]) for position in positions.values() if position.symbol in bars)
         equity_curve.append((date, mark_to_market))
-        exposure_samples.append((mark_to_market - cash) / mark_to_market if mark_to_market else 0.0)
+        invested_pct = (mark_to_market - cash) / mark_to_market if mark_to_market else 0.0
+        exposure_samples.append(invested_pct)
+        daily_states.append({
+            "date": date,
+            "holdings": len(positions),
+            "invested_pct": invested_pct,
+            "qqq_ma200_ready": bool(qqq_ma_ready.get(date, False)),
+            "qqq_above_ma200": bool(qqq_above_ma200.get(date, False)),
+        })
         max_positions_used = max(max_positions_used, len(positions))
 
     final_date = benchmark_dates.iloc[-1]
@@ -380,6 +393,39 @@ def run_portfolio_backtest(
 
     equity = pd.Series([value for _, value in equity_curve], dtype=float)
     drawdown = equity / equity.cummax() - 1
+    flat_periods: list[dict] = []
+    active_period: list[dict] = []
+    for state in daily_states:
+        is_flat = state["qqq_ma200_ready"] and state["holdings"] == 0
+        if is_flat:
+            active_period.append(state)
+        elif active_period:
+            blocked_days = sum(not item["qqq_above_ma200"] for item in active_period)
+            blocked_dates = [str(item["date"].date()) for item in active_period if not item["qqq_above_ma200"]]
+            allowed_dates = [str(item["date"].date()) for item in active_period if item["qqq_above_ma200"]]
+            flat_periods.append({
+                "start": str(active_period[0]["date"].date()),
+                "end": str(active_period[-1]["date"].date()),
+                "trading_days": len(active_period),
+                "qqq_below_ma200_days": blocked_days,
+                "qqq_below_ma200_dates": blocked_dates,
+                "qqq_above_ma200_dates": allowed_dates,
+                "reason": "QQQ below MA200" if blocked_days / len(active_period) >= 0.8 else "No open qualifying positions",
+            })
+            active_period = []
+    if active_period:
+        blocked_days = sum(not item["qqq_above_ma200"] for item in active_period)
+        blocked_dates = [str(item["date"].date()) for item in active_period if not item["qqq_above_ma200"]]
+        allowed_dates = [str(item["date"].date()) for item in active_period if item["qqq_above_ma200"]]
+        flat_periods.append({
+            "start": str(active_period[0]["date"].date()),
+            "end": str(active_period[-1]["date"].date()),
+            "trading_days": len(active_period),
+            "qqq_below_ma200_days": blocked_days,
+            "qqq_below_ma200_dates": blocked_dates,
+            "qqq_above_ma200_dates": allowed_dates,
+            "reason": "QQQ below MA200" if blocked_days / len(active_period) >= 0.8 else "No open qualifying positions",
+        })
     summary = summarize_moon_trades(trades, benchmark_history)
     summary.update({
         "measurement": "Daily marked-to-market portfolio equity curve.",
@@ -390,6 +436,7 @@ def run_portfolio_backtest(
         "max_positions_used": max_positions_used,
         "candidates_considered": candidates_considered,
         "candidates_rejected_capacity": candidates_rejected_capacity,
+        "flat_periods": flat_periods,
         "symbols_tested": len(frames),
         "symbols_skipped": skipped,
         "survivorship_bias_note": "Uses the current static NASDAQ 100/QQQ-like universe for the full period.",
