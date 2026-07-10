@@ -249,6 +249,7 @@ def run_portfolio_backtest(
     benchmark_frame["date"] = pd.to_datetime(benchmark_frame["date"]).dt.tz_localize(None).dt.normalize()
     benchmark_frame["ma200"] = benchmark_frame["close"].rolling(200).mean()
     qqq_ma_ready = pd.Series(benchmark_frame["ma200"].notna().to_numpy(), index=benchmark_frame["date"])
+    qqq_closes = pd.Series(benchmark_frame["close"].to_numpy(), index=benchmark_frame["date"])
 
     frames: dict[str, pd.DataFrame] = {}
     skipped: list[str] = []
@@ -375,6 +376,8 @@ def run_portfolio_backtest(
             "date": date,
             "holdings": len(positions),
             "invested_pct": invested_pct,
+            "equity": mark_to_market,
+            "qqq_close": float(qqq_closes.get(date, np.nan)),
             "qqq_ma200_ready": bool(qqq_ma_ready.get(date, False)),
             "qqq_above_ma200": bool(qqq_above_ma200.get(date, False)),
         })
@@ -481,6 +484,8 @@ def run_portfolio_backtest(
                 "date": str(state["date"].date()),
                 "holdings": state["holdings"],
                 "invested_pct": round(state["invested_pct"] * 100, 2),
+                "equity": round(state["equity"], 2),
+                "qqq_close": round(state["qqq_close"], 4),
                 "qqq_ma200_ready": state["qqq_ma200_ready"],
                 "qqq_above_ma200": state["qqq_above_ma200"],
             }
