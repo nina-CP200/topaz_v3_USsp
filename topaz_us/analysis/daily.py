@@ -42,6 +42,9 @@ def analyze_stocks(stock_list_file: str | os.PathLike = DEFAULT_STOCK_LIST) -> D
     qqq_history = get_history_data("QQQ", days=300)
     regime_info = classify_qqq_regime(qqq_history)
     qqq_above_ma200 = regime_info.get("qqq_above_ma200", False)
+    # The momentum overlay remains an experimental backtest feature until it
+    # passes broader validation. MA200 remains the live entry gate.
+    market_entry_allowed = qqq_above_ma200
 
     histories = load_histories(symbols, days=300)
     sentiment = get_market_sentiment(histories)
@@ -52,9 +55,9 @@ def analyze_stocks(stock_list_file: str | os.PathLike = DEFAULT_STOCK_LIST) -> D
         for _, row in features.iterrows():
             symbol = row["symbol"]
             breakdown = score_stock(row)
-            active_long_signal = bool(row.get("active_long_signal", False))
-            advice = get_advice_from_score(breakdown.composite_score, qqq_above_ma200, active_long_signal)
-            position_pct = suggest_position(breakdown.composite_score, qqq_above_ma200, active_long_signal)
+            active_long_signal = bool(row.get("active_long_signal", False)) and market_entry_allowed
+            advice = get_advice_from_score(breakdown.composite_score, market_entry_allowed, active_long_signal)
+            position_pct = suggest_position(breakdown.composite_score, market_entry_allowed, active_long_signal)
             results.append({
                 "symbol": symbol,
                 "name": meta.get(symbol, {}).get("name", symbol),
@@ -72,7 +75,7 @@ def analyze_stocks(stock_list_file: str | os.PathLike = DEFAULT_STOCK_LIST) -> D
                 "momentum_score": breakdown.momentum_score,
                 "entry_score": breakdown.entry_score,
                 "risk_penalty": breakdown.risk_penalty,
-                "signal_status": "Active Long" if active_long_signal else "Exit Warning" if row.get("bearish_sweep") else "No Signal",
+                "signal_status": "Active Long" if active_long_signal else "Market Hold" if row.get("moon_buy_signal") and not market_entry_allowed else "Exit Warning" if row.get("bearish_sweep") else "No Signal",
                 "bullish_sweep": bool(row.get("bullish_sweep", False)),
                 "bearish_sweep": bool(row.get("bearish_sweep", False)),
                 "trend_filter": bool(row.get("trend_filter", False)),
@@ -107,6 +110,10 @@ def analyze_stocks(stock_list_file: str | os.PathLike = DEFAULT_STOCK_LIST) -> D
         "advance_ratio": sentiment.get("advance_ratio", 0.0),
         "recommended_position": regime_info.get("recommended_position", 0.25),
         "qqq_above_ma200": qqq_above_ma200,
+        "market_momentum_state": regime_info.get("market_momentum_state", "normal"),
+        "market_entry_allowed": market_entry_allowed,
+        "market_momentum_entry_allowed": regime_info.get("market_entry_allowed", False),
+        "market_position_cap": regime_info.get("market_position_cap", 1.0),
         "qqq_ma20": regime_info.get("ma20"),
         "qqq_ma50": regime_info.get("ma50"),
         "qqq_ma200": regime_info.get("ma200"),
@@ -126,6 +133,9 @@ def save_analysis_result(analysis_data: Dict, output_file: str | os.PathLike = R
         "advance_ratio": analysis_data.get("advance_ratio", 0.0),
         "recommended_position": analysis_data.get("recommended_position", 0.25),
         "qqq_above_ma200": analysis_data.get("qqq_above_ma200", False),
+        "market_momentum_state": analysis_data.get("market_momentum_state", "normal"),
+        "market_entry_allowed": analysis_data.get("market_entry_allowed", False),
+        "market_position_cap": analysis_data.get("market_position_cap", 1.0),
         "total_stocks": len(results),
         "results": results,
     }

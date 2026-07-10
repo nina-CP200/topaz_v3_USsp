@@ -5,6 +5,7 @@ import unittest
 import pandas as pd
 
 from topaz_us.data.us_provider import _get_yfinance_proxy, _normalize_history
+from topaz_us.data.regime import classify_qqq_regime
 from topaz_us.strategy import build_cross_section_features, get_advice_from_score, score_stock, suggest_position
 
 
@@ -77,6 +78,20 @@ class USStrategyTests(unittest.TestCase):
     def test_qqq_below_ma200_caps_buy_signal(self):
         self.assertEqual(get_advice_from_score(92, qqq_above_ma200=False, active_long_signal=True), "可以关注")
         self.assertEqual(suggest_position(92, qqq_above_ma200=False, active_long_signal=True), 0.0)
+
+    def test_qqq_negative_momentum_activates_risk_off_override(self):
+        history = make_history(100, 0.25, days=260, symbol="QQQ")
+        for offset in range(20, 0, -1):
+            index = history.index[-offset]
+            history.loc[index, "close"] = history.loc[index - 1, "close"] - 1.5
+            history.loc[index, "open"] = history.loc[index, "close"] + 0.2
+            history.loc[index, "high"] = history.loc[index, "close"] + 0.5
+            history.loc[index, "low"] = history.loc[index, "close"] - 0.5
+
+        regime = classify_qqq_regime(history)
+        self.assertEqual(regime["market_momentum_state"], "risk_off")
+        self.assertFalse(regime["market_entry_allowed"])
+        self.assertEqual(regime["recommended_position"], 0.25)
 
     def test_yfinance_proxy_can_be_read_from_environment(self):
         import os

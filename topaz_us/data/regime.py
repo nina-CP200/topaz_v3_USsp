@@ -20,34 +20,62 @@ def classify_qqq_regime(history: pd.DataFrame | None) -> Dict:
     ma200 = close.rolling(200).mean().iloc[-1] if len(close) >= 200 else close.rolling(60).mean().iloc[-1]
     price = close.iloc[-1]
     ret_20d = price / close.iloc[-20] - 1 if len(close) >= 20 else 0.0
+    ret_5d = price / close.iloc[-5] - 1 if len(close) >= 5 else 0.0
+    ret_10d = price / close.iloc[-10] - 1 if len(close) >= 10 else 0.0
     above_ma200 = bool(price >= ma200)
 
-    if price > ma20 > ma50 and price > ma200 and ret_20d > 0:
-        regime = "bull"
-        position = 0.80
-        description = "QQQ is above key moving averages with positive 20-day momentum"
-    elif not above_ma200:
-        regime = "bear"
+    if ret_5d < 0 and ret_10d < 0 and ret_20d < 0:
+        momentum_state = "risk_off"
+        momentum_position = 0.25
+        entry_allowed = False
+        regime = "risk_off"
         position = 0.25
-        description = "QQQ is below MA200; new long entries are capped"
-    elif price < ma20 and ret_20d < 0:
-        regime = "pullback"
-        position = 0.45
-        description = "QQQ is above MA200 but short-term momentum is weak"
+        description = "QQQ 5/10/20-day momentum is all negative; 25% market risk-off cap is active"
+    elif ret_5d < 0 and ret_10d < 0:
+        momentum_state = "defensive"
+        momentum_position = 0.50
+        entry_allowed = False
+        regime = "defensive"
+        position = 0.50
+        description = "QQQ 5 and 10-day momentum are negative; defensive exposure cap is active"
     else:
-        regime = "sideways"
-        position = 0.55
-        description = "QQQ trend is mixed"
+        momentum_state = "normal"
+        momentum_position = 1.0
+        entry_allowed = above_ma200
+
+    if momentum_state == "normal":
+        if price > ma20 > ma50 and price > ma200 and ret_20d > 0:
+            regime = "bull"
+            position = 0.80
+            description = "QQQ is above key moving averages with positive 20-day momentum"
+        elif not above_ma200:
+            regime = "bear"
+            position = 0.25
+            entry_allowed = False
+            description = "QQQ is below MA200; new long entries are capped"
+        elif price < ma20 and ret_20d < 0:
+            regime = "pullback"
+            position = 0.45
+            description = "QQQ trend is mixed; short-term momentum is weak"
+        else:
+            regime = "sideways"
+            position = 0.55
+            description = "QQQ trend is mixed"
 
     return {
         "regime": regime,
         "description": description,
         "recommended_position": position,
         "qqq_above_ma200": above_ma200,
+        "market_momentum_state": momentum_state,
+        "market_entry_allowed": entry_allowed,
+        "market_position_cap": momentum_position,
         "ma20": float(ma20),
         "ma50": float(ma50),
         "ma200": float(ma200),
         "ret_20d": float(ret_20d),
+        "ret_5d": float(ret_5d),
+        "ret_10d": float(ret_10d),
     }
 
 
@@ -60,7 +88,8 @@ def get_market_adjusted_thresholds(market_env: str) -> Dict:
         "bull": {"buy_threshold": 75, "sell_threshold": 50, "position_max": 0.80},
         "sideways": {"buy_threshold": 75, "sell_threshold": 50, "position_max": 0.55},
         "pullback": {"buy_threshold": 75, "sell_threshold": 50, "position_max": 0.45},
+        "defensive": {"buy_threshold": 101, "sell_threshold": 50, "position_max": 0.50},
+        "risk_off": {"buy_threshold": 101, "sell_threshold": 50, "position_max": 0.25},
         "bear": {"buy_threshold": 101, "sell_threshold": 50, "position_max": 0.25},
     }
     return thresholds.get(market_env, thresholds["sideways"])
-

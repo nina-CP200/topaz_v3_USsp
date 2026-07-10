@@ -40,6 +40,9 @@ class PortfolioBacktestConfig:
     max_positions: int = 10
     position_size_pct: float = 0.08
     initial_capital: float = 100_000.0
+    use_market_momentum_overlay: bool = False
+    defensive_exposure_cap: float = 0.50
+    risk_off_exposure_cap: float = 0.25
     max_symbols: int | None = None
     use_cache: bool = True
 
@@ -230,12 +233,30 @@ def _portfolio_entry_score(row: pd.Series) -> float:
     return max(0.0, score)
 
 
+def _market_momentum_states(benchmark: pd.DataFrame) -> pd.Series:
+    close = benchmark["close"]
+    ret_5 = close.pct_change(5)
+    ret_10 = close.pct_change(10)
+    ret_20 = close.pct_change(20)
+    states = pd.Series("normal", index=benchmark.index, dtype="object")
+    defensive = (ret_5 < 0) & (ret_10 < 0)
+    risk_off = defensive & (ret_20 < 0)
+    states.loc[defensive] = "defensive"
+    states.loc[risk_off] = "risk_off"
+    return pd.Series(states.to_numpy(), index=benchmark["date"])
+
+
 def run_portfolio_backtest(
     config: PortfolioBacktestConfig,
     stock_list_file: str | Path = DEFAULT_STOCK_LIST,
 ) -> dict:
     """Simulate a capped, equal-weight portfolio of the daily QQQ candidates."""
-    if config.max_positions < 1 or not 0 < config.position_size_pct <= 1 or config.initial_capital <= 0:
+    if (
+        config.max_positions < 1
+        or not 0 < config.position_size_pct <= 1
+        or not 0 <= config.risk_off_exposure_cap <= config.defensive_exposure_cap <= 1
+        or config.initial_capital <= 0
+    ):
         raise ValueError("Portfolio sizing parameters must be positive.")
 
     stocks = load_us_stock_list(stock_list_file)
@@ -250,6 +271,7 @@ def run_portfolio_backtest(
     benchmark_frame["ma200"] = benchmark_frame["close"].rolling(200).mean()
     qqq_ma_ready = pd.Series(benchmark_frame["ma200"].notna().to_numpy(), index=benchmark_frame["date"])
     qqq_closes = pd.Series(benchmark_frame["close"].to_numpy(), index=benchmark_frame["date"])
+    market_momentum_states = _market_momentum_states(benchmark_frame)
 
     frames: dict[str, pd.DataFrame] = {}
     skipped: list[str] = []
@@ -265,7 +287,11 @@ def run_portfolio_backtest(
         for index in range(max(200, SLOW_TMA_LENGTH), len(frame) - 1):
             signal = frame.iloc[index]
             signal_date = pd.Timestamp(signal["date"]).normalize()
-            if not bool(qqq_above_ma200.get(signal_date, False)) or not bool(signal["moon_buy_signal"]):
+            if (
+                not bool(qqq_above_ma200.get(signal_date, False))
+                or not bool(signal["moon_buy_signal"])
+                or (config.use_market_momentum_overlay and market_momentum_states.get(signal_date) != "normal")
+            ):
                 continue
             entry_date = pd.Timestamp(frame.iloc[index + 1]["date"]).normalize()
             candidates_by_date.setdefault(entry_date, []).append((_portfolio_entry_score(signal), symbol, index))
@@ -274,6 +300,7 @@ def run_portfolio_backtest(
     cash = float(config.initial_capital)
     positions: dict[str, OpenPosition] = {}
     pending_exits: dict[pd.Timestamp, set[str]] = {}
+    pending_market_caps: dict[pd.Timestamp, tuple[float, str]] = {}
     trades: list[Trade] = []
     equity_curve: list[tuple[pd.Timestamp, float]] = []
     exposure_samples: list[float] = []
@@ -303,7 +330,7 @@ def run_portfolio_backtest(
         ))
         positions.pop(position.symbol, None)
 
-    for date in benchmark_dates:
+    for date_index, date in enumerate(benchmark_dates):
         bars = {
             symbol: frame.loc[frame["date"] == date].iloc[0]
             for symbol, frame in frames.items()
@@ -315,6 +342,21 @@ def run_portfolio_backtest(
             bar = bars.get(symbol)
             if position is not None and bar is not None:
                 close_position(position, date, float(bar["open"]), "bearish_liquidity_sweep")
+
+        pending_cap = pending_market_caps.pop(date, None)
+        if pending_cap is not None:
+            cap, reason = pending_cap
+            gross_value = sum(position.shares * float(bars[position.symbol]["open"]) for position in positions.values() if position.symbol in bars)
+            equity_at_open = cash + gross_value
+            for position in sorted(positions.values(), key=lambda item: item.entry_score):
+                if not equity_at_open or gross_value / equity_at_open <= cap:
+                    break
+                bar = bars.get(position.symbol)
+                if bar is None:
+                    continue
+                gross_value -= position.shares * float(bar["open"])
+                close_position(position, date, float(bar["open"]), reason)
+                equity_at_open = cash + gross_value
 
         equity_at_open = cash + sum(position.shares * float(bars[position.symbol]["open"]) for position in positions.values() if position.symbol in bars)
         daily_candidates = sorted(candidates_by_date.get(date, []), reverse=True)
@@ -368,6 +410,16 @@ def run_portfolio_backtest(
                 exit_date = pd.Timestamp(symbol_frame.iloc[current_index + 1]["date"]).normalize()
                 pending_exits.setdefault(exit_date, set()).add(symbol)
 
+        market_momentum_state = market_momentum_states.get(date, "normal")
+        if config.use_market_momentum_overlay and date_index + 1 < len(benchmark_dates):
+            next_date = benchmark_dates.iloc[date_index + 1]
+            if market_momentum_state == "risk_off":
+                pending_market_caps[next_date] = (config.risk_off_exposure_cap, "market_momentum_risk_off")
+            elif market_momentum_state == "defensive":
+                existing = pending_market_caps.get(next_date)
+                if existing is None or existing[0] > config.defensive_exposure_cap:
+                    pending_market_caps[next_date] = (config.defensive_exposure_cap, "market_momentum_defensive")
+
         mark_to_market = cash + sum(position.shares * float(bars[position.symbol]["close"]) for position in positions.values() if position.symbol in bars)
         equity_curve.append((date, mark_to_market))
         invested_pct = (mark_to_market - cash) / mark_to_market if mark_to_market else 0.0
@@ -380,6 +432,7 @@ def run_portfolio_backtest(
             "qqq_close": float(qqq_closes.get(date, np.nan)),
             "qqq_ma200_ready": bool(qqq_ma_ready.get(date, False)),
             "qqq_above_ma200": bool(qqq_above_ma200.get(date, False)),
+            "market_momentum_state": market_momentum_state,
         })
         max_positions_used = max(max_positions_used, len(positions))
 
@@ -469,6 +522,7 @@ def run_portfolio_backtest(
         "max_positions_used": max_positions_used,
         "candidates_considered": candidates_considered,
         "candidates_rejected_capacity": candidates_rejected_capacity,
+        "market_momentum_overlay": config.use_market_momentum_overlay,
         "flat_periods": flat_periods,
         "low_exposure_periods": low_exposure_periods,
         "symbols_tested": len(frames),
@@ -488,6 +542,7 @@ def run_portfolio_backtest(
                 "qqq_close": round(state["qqq_close"], 4),
                 "qqq_ma200_ready": state["qqq_ma200_ready"],
                 "qqq_above_ma200": state["qqq_above_ma200"],
+                "market_momentum_state": state["market_momentum_state"],
             }
             for state in daily_states
         ],
