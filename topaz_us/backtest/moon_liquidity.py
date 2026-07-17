@@ -555,16 +555,33 @@ def main() -> None:
     parser.add_argument("--max-holding-days", type=int, default=40)
     parser.add_argument("--max-symbols", type=int, default=None)
     parser.add_argument("--no-cache", action="store_true")
+    parser.add_argument("--portfolio", action="store_true", help="Run the deployable capped portfolio simulation.")
+    parser.add_argument(
+        "--market-momentum-overlay",
+        action="store_true",
+        help="Apply the experimental momentum overlay (research comparison only).",
+    )
     parser.add_argument("--output", type=Path, default=None)
     args = parser.parse_args()
-    result = run_backtest(
-        BacktestConfig(
+    if args.portfolio:
+        result = run_portfolio_backtest(
+            PortfolioBacktestConfig(
+                days=args.days,
+                max_holding_days=args.max_holding_days,
+                max_symbols=args.max_symbols,
+                use_cache=not args.no_cache,
+                use_market_momentum_overlay=args.market_momentum_overlay,
+            )
+        )
+    else:
+        result = run_backtest(
+            BacktestConfig(
             days=args.days,
             max_holding_days=args.max_holding_days,
             max_symbols=args.max_symbols,
             use_cache=not args.no_cache,
+            )
         )
-    )
     payload = json.dumps(result, ensure_ascii=False, indent=2)
     if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)

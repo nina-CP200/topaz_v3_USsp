@@ -3,24 +3,24 @@ import {
   DashboardOutlined,
   StockOutlined,
   WalletOutlined,
-  QuestionCircleOutlined,
+  ExperimentOutlined,
   SettingOutlined,
 } from '@ant-design/icons'
 
 const navItems = [
-  { path: '/dashboard', icon: <DashboardOutlined />, label: '市场总览' },
-  { path: '/stocks', icon: <StockOutlined />, label: 'NASDAQ 100' },
+  { path: '/dashboard', icon: <DashboardOutlined />, label: '每日决策' },
+  { path: '/stocks', icon: <StockOutlined />, label: '市场扫描' },
   { path: '/portfolio', icon: <WalletOutlined />, label: '我的组合' },
-  { path: '/about', icon: <QuestionCircleOutlined />, label: '使用说明' },
-  { path: '/settings', icon: <SettingOutlined />, label: '系统设置' },
+  { path: '/research', icon: <ExperimentOutlined />, label: '策略研究' },
+  { path: '/settings', icon: <SettingOutlined />, label: '设置' },
 ]
 
 const pageTitleMap: Record<string, string> = {
-  '/dashboard': '市场总览',
-  '/stocks': 'NASDAQ 100',
+  '/dashboard': '每日决策',
+  '/stocks': '市场扫描',
   '/portfolio': '我的组合',
-  '/about': '使用说明',
-  '/settings': '系统设置',
+  '/research': '策略研究',
+  '/settings': '设置',
 }
 
 export default function AppLayout() {
@@ -30,13 +30,13 @@ export default function AppLayout() {
   const pageTitle = pageTitleMap[currentPath] || 'Topaz-Next'
 
   return (
-    <div style={{
+    <div className="app-shell" style={{
       display: 'flex',
       height: '100vh',
       overflow: 'hidden',
     }}>
       {/* Sidebar */}
-      <aside style={{
+      <aside className="app-sidebar" style={{
         width: 240,
         minWidth: 240,
         background: 'var(--bg-sidebar)',
@@ -183,14 +183,14 @@ export default function AppLayout() {
       </aside>
 
       {/* Main Content */}
-      <div style={{
+      <div className="app-main" style={{
         flex: 1,
         display: 'flex',
         flexDirection: 'column',
         minWidth: 0,
       }}>
         {/* Header */}
-        <header style={{
+        <header className="app-header" style={{
           height: 52,
           minHeight: 52,
           background: 'var(--bg-sidebar)',
@@ -245,7 +245,7 @@ export default function AppLayout() {
         </header>
 
         {/* Content Area */}
-        <main style={{
+        <main className="app-content" style={{
           flex: 1,
           overflow: 'auto',
           padding: '20px 24px',

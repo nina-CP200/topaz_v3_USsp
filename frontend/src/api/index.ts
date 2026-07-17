@@ -66,6 +66,14 @@ export interface StockResult {
   rank: number
   predicted_return: number
   risk_level: string
+  trend_score?: number
+  signal_score?: number
+  volume_score?: number
+  volatility_score?: number
+  relative_strength_score?: number
+  momentum_score?: number
+  entry_score?: number
+  risk_penalty?: number
 }
 
 export interface DailyAnalysis {
@@ -79,7 +87,98 @@ export interface DailyAnalysis {
   benchmark?: string
   market_description?: string
   qqq_above_ma200?: boolean
+  market_entry_allowed?: boolean
+  market_momentum_state?: string
+  market_position_cap?: number
+  qqq_ma20?: number | null
+  qqq_ma50?: number | null
+  qqq_ma200?: number | null
   results: StockResult[]
+}
+
+export type DecisionAction = 'enter' | 'add' | 'hold' | 'reduce' | 'exit' | 'unavailable'
+
+export interface DecisionCandidate {
+  symbol: string
+  name: string
+  sector: string
+  rank: number
+  current_price: number
+  change_pct?: number
+  composite_score?: number
+  target_pct: number
+  target_value_usd: number
+  entry_price?: number | null
+  stop_loss?: number | null
+  action: DecisionAction
+  reasons: string[]
+}
+
+export interface DecisionHolding {
+  symbol: string
+  name: string
+  sector?: string
+  shares: number
+  cost: number
+  current_price?: number
+  market_value_usd?: number
+  current_pct?: number
+  target_pct?: number
+  target_value_usd?: number
+  delta_value_usd?: number
+  pnl_usd?: number
+  pnl_pct?: number
+  action: DecisionAction
+  entry_price?: number | null
+  stop_loss?: number | null
+  composite_score?: number
+  signal_status?: string
+  reasons: string[]
+}
+
+export interface DailyDecision {
+  has_analysis: boolean
+  analysis_date: string | null
+  strategy_name: string
+  capital: { investable_capital_usd: number }
+  market: {
+    regime?: string
+    description?: string
+    entry_allowed?: boolean
+    qqq_above_ma200?: boolean
+    recommended_position_pct?: number
+    advance_ratio?: number
+    qqq_ma20?: number | null
+    qqq_ma50?: number | null
+    qqq_ma200?: number | null
+  }
+  portfolio: {
+    current_value_usd: number
+    current_pct: number
+    target_value_usd: number
+    target_pct: number
+  }
+  candidates: DecisionCandidate[]
+  holdings: DecisionHolding[]
+  exit_warnings: Array<{ symbol: string; name: string; is_holding: boolean; current_price?: number; reasons: string[] }>
+  data_status: { status: string; message: string; stale: boolean }
+}
+
+export interface DecisionSettings {
+  investable_capital_usd: number
+}
+
+export interface ResearchResult {
+  source: string
+  summary: Record<string, unknown>
+  daily_exposure: Array<{ date: string; invested_pct: number; equity: number; holdings: number; qqq_above_ma200: boolean; market_momentum_state: string }>
+}
+
+export interface ResearchSnapshot {
+  available: boolean
+  baseline: ResearchResult | null
+  momentum_overlay: ResearchResult | null
+  message: string
 }
 
 export interface HoldingItem {
@@ -134,6 +233,26 @@ export async function getMarketHistory(days = 60): Promise<{ data: KLineItem[] }
 
 export async function getDailyAnalysis(): Promise<DailyAnalysis> {
   const r = await api.get('/analysis/daily')
+  return r.data
+}
+
+export async function getDailyDecision(): Promise<DailyDecision> {
+  const r = await api.get('/decision/daily')
+  return r.data
+}
+
+export async function getDecisionSettings(): Promise<DecisionSettings> {
+  const r = await api.get('/settings/decision')
+  return r.data
+}
+
+export async function saveDecisionSettings(settings: DecisionSettings): Promise<DecisionSettings> {
+  const r = await api.put('/settings/decision', settings)
+  return r.data
+}
+
+export async function getLatestResearch(): Promise<ResearchSnapshot> {
+  const r = await api.get('/research/latest')
   return r.data
 }
 

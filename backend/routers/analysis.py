@@ -20,6 +20,11 @@ _lock = threading.Lock()
 _status = {"status": "idle", "progress": 0, "message": ""}
 
 
+def get_status_snapshot() -> dict:
+    with _lock:
+        return dict(_status)
+
+
 def _save_status(status: str, progress: int, message: str):
     global _status
     with _lock:
@@ -43,8 +48,7 @@ def daily_analysis():
 
 @router.get("/status")
 def analysis_status():
-    with _lock:
-        return dict(_status)
+    return get_status_snapshot()
 
 
 @router.get("/report")
@@ -231,6 +235,14 @@ def _run_analysis():
             "benchmark": "QQQ",
             "market_description": result.get("market_description", ""),
             "qqq_above_ma200": result.get("qqq_above_ma200", False),
+            "market_entry_allowed": result.get("market_entry_allowed", False),
+            "market_momentum_state": result.get("market_momentum_state", "normal"),
+            "market_momentum_entry_allowed": result.get("market_momentum_entry_allowed", False),
+            "market_position_cap": result.get("market_position_cap", 1.0),
+            "qqq_ma20": result.get("qqq_ma20"),
+            "qqq_ma50": result.get("qqq_ma50"),
+            "qqq_ma200": result.get("qqq_ma200"),
+            "sentiment": result.get("sentiment", {}),
             "total_stocks": len(sorted_results),
             "results": sorted_results,
         }

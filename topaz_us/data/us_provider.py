@@ -65,7 +65,10 @@ def _get_yfinance_proxy() -> str | None:
     local_env.update(_read_env_file(PROJECT_ROOT / "config" / ".env"))
 
     for key in PROXY_ENV_KEYS:
-        value = os.environ.get(key) or local_env.get(key)
+        environment_value = os.environ.get(key)
+        if environment_value and environment_value.lower() in {"0", "false", "none", "off"}:
+            return None
+        value = environment_value or local_env.get(key)
         if value and value.lower() not in {"0", "false", "none", "off"}:
             return value
     return None

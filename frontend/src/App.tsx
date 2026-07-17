@@ -5,7 +5,7 @@ import AppLayout from './components/AppLayout'
 import Dashboard from './pages/Dashboard'
 import Stocks from './pages/Stocks'
 import Portfolio from './pages/Portfolio'
-import About from './pages/About'
+import Research from './pages/Research'
 import Settings from './pages/Settings'
 import './styles/global.css'
 
@@ -66,7 +66,8 @@ export default function App() {
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/stocks" element={<Stocks />} />
             <Route path="/portfolio" element={<Portfolio />} />
-            <Route path="/about" element={<About />} />
+            <Route path="/research" element={<Research />} />
+            <Route path="/about" element={<Navigate to="/research" replace />} />
             <Route path="/settings" element={<Settings />} />
           </Route>
         </Routes>

@@ -8,7 +8,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
-from backend.routers import market, analysis, portfolio, settings
+from backend.routers import market, analysis, portfolio, settings, decision, research
 
 app = FastAPI(title="Topaz US API", version="1.0.0")
 
@@ -24,6 +24,8 @@ app.include_router(market.router, prefix="/api/market", tags=["market"])
 app.include_router(analysis.router, prefix="/api/analysis", tags=["analysis"])
 app.include_router(portfolio.router, prefix="/api/portfolio", tags=["portfolio"])
 app.include_router(settings.router, prefix="/api/settings", tags=["settings"])
+app.include_router(decision.router, prefix="/api/decision", tags=["decision"])
+app.include_router(research.router, prefix="/api/research", tags=["research"])
 
 
 @app.get("/api/health")

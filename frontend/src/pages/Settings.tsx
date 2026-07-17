@@ -1,110 +1,40 @@
 import { useEffect, useState } from 'react'
-import { Card, Input, Button, message, Spin, Typography, Table, Popconfirm } from 'antd'
-import { PlusOutlined, DeleteOutlined } from '@ant-design/icons'
-import { listSlackConfigs, saveSlackConfigs } from '../api'
+import { Button, Card, Input, InputNumber, Popconfirm, Spin, Table, message } from 'antd'
+import { DeleteOutlined, PlusOutlined, SaveOutlined } from '@ant-design/icons'
+import { getDecisionSettings, listSlackConfigs, saveDecisionSettings, saveSlackConfigs } from '../api'
 import type { SlackConfigItem } from '../api'
 
-const { Text } = Typography
-
 export default function Settings() {
+  const [capital, setCapital] = useState(100_000)
   const [configs, setConfigs] = useState<SlackConfigItem[]>([])
   const [loading, setLoading] = useState(true)
-  const [saving, setSaving] = useState(false)
+  const [savingCapital, setSavingCapital] = useState(false)
+  const [savingSlack, setSavingSlack] = useState(false)
 
   useEffect(() => {
-    listSlackConfigs()
-      .then(r => setConfigs(r.configs || []))
-      .catch(() => {})
+    Promise.all([getDecisionSettings(), listSlackConfigs()])
+      .then(([settings, slack]) => { setCapital(settings.investable_capital_usd); setConfigs(slack.configs || []) })
+      .catch(() => message.warning('部分本地设置无法读取'))
       .finally(() => setLoading(false))
   }, [])
 
-  const addRow = () => {
-    setConfigs([...configs, { name: '', token: '', channel: '' }])
-  }
-
-  const deleteRow = (idx: number) => {
-    setConfigs(configs.filter((_, i) => i !== idx))
-  }
-
-  const updateField = (idx: number, field: keyof SlackConfigItem, value: string) => {
-    setConfigs(configs.map((c, i) => (i === idx ? { ...c, [field]: value } : c)))
-  }
-
-  const handleSave = () => {
-    const empty = configs.some(c => !c.name)
-    if (empty) { message.warning('请填写所有配置的名称'); return }
-    setSaving(true)
-    saveSlackConfigs(configs)
-      .then(() => message.success('Slack 配置已保存'))
-      .catch(() => message.error('保存失败'))
-      .finally(() => setSaving(false))
-  }
-
-  const columns = [
-    {
-      title: '客户名称', dataIndex: 'name', key: 'name', width: 140,
-      render: (_: any, __: any, idx: number) => (
-        <Input size="small" placeholder="如：张三" value={configs[idx].name}
-          onChange={e => updateField(idx, 'name', e.target.value)} />
-      ),
-    },
-    {
-      title: 'Bot Token', dataIndex: 'token', key: 'token',
-      render: (_: any, __: any, idx: number) => (
-        <Input.Password size="small" placeholder="xoxb-..." value={configs[idx].token}
-          onChange={e => updateField(idx, 'token', e.target.value)} />
-      ),
-    },
-    {
-      title: '频道 ID', dataIndex: 'channel', key: 'channel', width: 140,
-      render: (_: any, __: any, idx: number) => (
-        <Input size="small" placeholder="C0XXXXXXXX" value={configs[idx].channel}
-          onChange={e => updateField(idx, 'channel', e.target.value)} />
-      ),
-    },
-    {
-      title: '', key: 'action', width: 50,
-      render: (_: any, __: any, idx: number) => (
-        <Popconfirm title="删除？" onConfirm={() => deleteRow(idx)}>
-          <Button size="small" danger icon={<DeleteOutlined />} />
-        </Popconfirm>
-      ),
-    },
+  const updateConfig = (index: number, field: keyof SlackConfigItem, value: string) => setConfigs(current => current.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: value } : item))
+  const slackColumns = [
+    { title: '配置名称', dataIndex: 'name', width: 140, render: (_: unknown, __: SlackConfigItem, index: number) => <Input size="small" value={configs[index].name} onChange={event => updateConfig(index, 'name', event.target.value)} /> },
+    { title: 'Bot Token', dataIndex: 'token', render: (_: unknown, __: SlackConfigItem, index: number) => <Input.Password size="small" placeholder="xoxb-…" value={configs[index].token} onChange={event => updateConfig(index, 'token', event.target.value)} /> },
+    { title: '频道 ID', dataIndex: 'channel', width: 150, render: (_: unknown, __: SlackConfigItem, index: number) => <Input size="small" placeholder="C0…" value={configs[index].channel} onChange={event => updateConfig(index, 'channel', event.target.value)} /> },
+    { title: '', width: 52, render: (_: unknown, __: SlackConfigItem, index: number) => <Popconfirm title="删除此配置？" onConfirm={() => setConfigs(current => current.filter((__, itemIndex) => itemIndex !== index))}><Button size="small" danger icon={<DeleteOutlined />} aria-label="删除通知配置" /></Popconfirm> },
   ]
 
   if (loading) return <Spin size="large" style={{ display: 'block', marginTop: 120 }} />
-
-  return (
-    <div style={{ maxWidth: 800 }}>
-      <Card title="Slack 推送配置" style={{ marginBottom: 16 }} className="fade-in-up stagger-1">
-        <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginBottom: 16, marginTop: 0 }}>
-          添加多个客户配置后，在 NASDAQ 100 页面选择发送给指定客户或一键群发。
-        </p>
-
-        <Table
-          dataSource={configs}
-          columns={columns}
-          rowKey={(_, idx) => String(idx)}
-          size="small"
-          pagination={false}
-          style={{ marginBottom: 12 }}
-        />
-
-        <div style={{ display: 'flex', gap: 8 }}>
-          <Button icon={<PlusOutlined />} onClick={addRow}>添加客户</Button>
-          <Button type="primary" loading={saving} onClick={handleSave}>保存配置</Button>
-        </div>
-      </Card>
-
-      <Card title="如何获取 Token？" className="fade-in-up stagger-2">
-        <ol style={{ margin: 0, paddingLeft: 20, lineHeight: 2, color: 'var(--text-secondary)', fontSize: 13 }}>
-          <li>访问 api.slack.com/apps 创建 App</li>
-          <li>在 OAuth &amp; Permissions 中添加权限：<Text code style={{ color: 'var(--accent)' }}>chat:write</Text>、<Text code style={{ color: 'var(--accent)' }}>chat:write.public</Text></li>
-          <li>Install to Workspace 后复制 Bot User OAuth Token</li>
-          <li>在 Slack 中右键频道 - 复制链接 - 提取频道 ID</li>
-          <li>邀请 Bot 到频道：<Text code style={{ color: 'var(--accent)' }}>/invite @Bot名称</Text></li>
-        </ol>
-      </Card>
-    </div>
-  )
+  return <div className="settings-page">
+    <Card title="决策资金">
+      <div className="setting-line"><div><strong>可投资总额</strong><span>USD</span></div><InputNumber min={0} precision={0} prefix="$" value={capital} onChange={value => setCapital(value || 0)} style={{ width: 220 }} /><Button type="primary" icon={<SaveOutlined />} loading={savingCapital} onClick={async () => { setSavingCapital(true); try { await saveDecisionSettings({ investable_capital_usd: capital }); message.success('资金规模已保存') } catch { message.error('保存失败') } finally { setSavingCapital(false) } }}>保存</Button></div>
+      <div className="settings-note">该金额只用于换算建议目标金额；系统不会连接券商或生成订单。</div>
+    </Card>
+    <Card title="Slack 通知" style={{ marginTop: 16 }}>
+      <Table dataSource={configs} columns={slackColumns} rowKey={(_, index) => String(index)} size="small" pagination={false} scroll={{ x: 660 }} />
+      <div style={{ marginTop: 12 }}><Button icon={<PlusOutlined />} onClick={() => setConfigs(current => [...current, { name: '', token: '', channel: '' }])}>添加配置</Button><Button type="primary" loading={savingSlack} onClick={async () => { if (configs.some(item => !item.name)) { message.warning('请填写每个配置的名称'); return }; setSavingSlack(true); try { await saveSlackConfigs(configs); message.success('通知配置已保存') } catch { message.error('保存失败') } finally { setSavingSlack(false) } }} style={{ marginLeft: 8 }}>保存通知配置</Button></div>
+    </Card>
+  </div>
 }

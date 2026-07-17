@@ -5,6 +5,7 @@ import unittest
 import pandas as pd
 
 from topaz_us.data.us_provider import _get_yfinance_proxy, _normalize_history
+from topaz_us.decision import MAX_SINGLE_POSITION_PCT, build_decision_snapshot
 from topaz_us.data.regime import classify_qqq_regime
 from topaz_us.strategy import build_cross_section_features, get_advice_from_score, score_stock, suggest_position
 
@@ -45,6 +46,64 @@ def make_accumulation_history(symbol: str = "ACCUM") -> pd.DataFrame:
 
 
 class USStrategyTests(unittest.TestCase):
+    def test_decision_blocks_entries_when_qqq_gate_is_closed(self):
+        analysis = {
+            "date": "2026-07-15 16:00",
+            "qqq_above_ma200": False,
+            "market_entry_allowed": False,
+            "recommended_position": 0.5,
+            "results": [{
+                "symbol": "AAPL", "name": "Apple", "rank": 1,
+                "active_long_signal": True, "position_pct": 0.08,
+                "current_price": 200, "composite_score": 90,
+            }],
+        }
+        snapshot = build_decision_snapshot(analysis, [], 100_000)
+        self.assertFalse(snapshot["market"]["entry_allowed"])
+        self.assertEqual(snapshot["candidates"], [])
+
+    def test_decision_never_exceeds_individual_or_gross_limits(self):
+        results = [
+            {
+                "symbol": f"T{i}", "name": f"Test {i}", "rank": i,
+                "active_long_signal": True, "position_pct": 0.12,
+                "current_price": 100, "composite_score": 95,
+            }
+            for i in range(1, 12)
+        ]
+        snapshot = build_decision_snapshot({
+            "market_entry_allowed": True,
+            "qqq_above_ma200": True,
+            "recommended_position": 0.2,
+            "results": results,
+        }, [], 100_000)
+        targets = [candidate["target_pct"] for candidate in snapshot["candidates"]]
+        self.assertTrue(all(target <= MAX_SINGLE_POSITION_PCT for target in targets))
+        self.assertLessEqual(sum(targets), 0.2)
+
+    def test_decision_maps_five_holding_actions(self):
+        base = {
+            "market_entry_allowed": True,
+            "qqq_above_ma200": True,
+            "recommended_position": 0.4,
+            "results": [
+                {"symbol": "ADD", "rank": 1, "active_long_signal": True, "position_pct": 0.08, "current_price": 100},
+                {"symbol": "EXIT", "rank": 2, "bearish_sweep": True, "current_price": 100},
+                {"symbol": "REDUCE", "rank": 3, "current_price": 100},
+                {"symbol": "HOLD", "rank": 4, "current_price": 100},
+            ],
+        }
+        snapshot = build_decision_snapshot(base, [
+            {"symbol": "ADD", "shares": 10, "cost": 90},
+            {"symbol": "EXIT", "shares": 10, "cost": 90},
+            {"symbol": "REDUCE", "shares": 100, "cost": 90},
+            {"symbol": "HOLD", "shares": 20, "cost": 90},
+        ], 100_000)
+        actions = {holding["symbol"]: holding["action"] for holding in snapshot["holdings"]}
+        self.assertEqual(actions["ADD"], "add")
+        self.assertEqual(actions["EXIT"], "exit")
+        self.assertEqual(actions["REDUCE"], "reduce")
+        self.assertEqual(actions["HOLD"], "hold")
     def test_yfinance_shape_is_normalized(self):
         raw = pd.DataFrame({
             "Date": pd.date_range("2025-01-01", periods=3),

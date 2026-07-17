@@ -33,6 +33,19 @@ class StockResultItem(BaseModel):
     rank: int
     predicted_return: float
     risk_level: str
+    signal_status: str = "No Signal"
+    active_long_signal: bool = False
+    bearish_sweep: bool = False
+    entry_price: float | None = None
+    stop_loss: float | None = None
+    trend_score: float | None = None
+    signal_score: float | None = None
+    volume_score: float | None = None
+    volatility_score: float | None = None
+    relative_strength_score: float | None = None
+    momentum_score: float | None = None
+    entry_score: float | None = None
+    risk_penalty: float | None = None
 
 
 class DailyAnalysisResult(BaseModel):
@@ -43,6 +56,14 @@ class DailyAnalysisResult(BaseModel):
     recommended_position: float
     total_stocks: int
     results: list[StockResultItem]
+    market_description: str = ""
+    qqq_above_ma200: bool = False
+    market_entry_allowed: bool = False
+    market_momentum_state: str = "normal"
+    market_position_cap: float = 1.0
+    qqq_ma20: float | None = None
+    qqq_ma50: float | None = None
+    qqq_ma200: float | None = None
 
 
 class MarketOverview(BaseModel):

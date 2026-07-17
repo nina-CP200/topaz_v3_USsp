@@ -55,6 +55,13 @@ uv run python -m topaz_us.analysis.daily
 uv run python -m topaz_us.backtest.moon_liquidity --days 500 --max-holding-days 40
 ```
 
+Save the current strategy research shown in the app:
+
+```bash
+uv run python -m topaz_us.backtest.moon_liquidity --portfolio --days 500 --max-holding-days 40 --output data/raw/moon_portfolio_baseline.json
+uv run python -m topaz_us.backtest.moon_liquidity --portfolio --market-momentum-overlay --days 500 --max-holding-days 40 --output data/raw/moon_portfolio_momentum_overlay.json
+```
+
 Query the latest results:
 
 ```bash
@@ -73,9 +80,12 @@ TOPAZ_YF_PROXY=http://127.0.0.1:7897
 For day-to-day development, use two terminals:
 
 ```bash
-make dev-backend
-make dev-frontend
+./dev.sh
 ```
+
+This starts FastAPI on `http://127.0.0.1:8000` and the Vite frontend on
+`http://127.0.0.1:5173`. Press `Ctrl+C` once to stop both services. Override
+ports with `BACKEND_PORT=8001 FRONTEND_PORT=5174 ./dev.sh` when needed.
 
 Run all local checks:
 
@@ -95,9 +105,13 @@ Project documentation:
 - `GET /api/analysis/daily`
 - `POST /api/analysis/refresh`
 - `GET /api/analysis/report`
+- `GET /api/decision/daily`
 - `GET /api/portfolio`
 - `PUT /api/portfolio`
 - `POST /api/portfolio/analyze`
+- `GET /api/settings/decision`
+- `PUT /api/settings/decision`
+- `GET /api/research/latest`
 
 ## Notes
 
