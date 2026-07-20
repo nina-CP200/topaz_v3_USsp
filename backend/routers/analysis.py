@@ -7,6 +7,7 @@ import requests
 from fastapi import APIRouter, HTTPException, Query
 from topaz_us.analysis.query import load_analysis_results
 from topaz_us.analysis.daily import analyze_stocks
+from topaz_us.decision import MAX_GROSS_POSITION_PCT
 from topaz_us.reports.sender import build_score_ranking_blocks
 from backend.routers.common import PROJECT_ROOT, patch_results
 
@@ -67,7 +68,7 @@ def analysis_report():
 
     confidence = data.get("model_confidence", 1.0)
     adv_ratio = data.get("advance_ratio", 0.5)
-    position = data.get("recommended_position", 0.5)
+    position = min(float(data.get("recommended_position", 0.5)), MAX_GROSS_POSITION_PCT)
     date = data.get("date", datetime.now().strftime("%Y-%m-%d %H:%M"))
 
     sorted_by_score = sorted(results, key=lambda x: x.get("composite_score", 0), reverse=True)

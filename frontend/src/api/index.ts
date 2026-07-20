@@ -171,6 +171,21 @@ export interface DecisionSettings {
 export interface ResearchResult {
   source: string
   summary: Record<string, unknown>
+  annual_results: Array<{
+    year: number
+    warmup_only: boolean
+    start: string
+    end: string
+    portfolio_return_pct: number
+    qqq_return_pct: number
+    excess_return_pct: number
+    portfolio_max_drawdown_pct: number
+    average_invested_pct: number
+    max_invested_pct: number
+    max_positions_used: number
+    trade_count: number
+    trading_days: number
+  }>
   daily_exposure: Array<{ date: string; invested_pct: number; equity: number; holdings: number; qqq_above_ma200: boolean; market_momentum_state: string }>
 }
 

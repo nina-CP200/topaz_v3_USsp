@@ -38,7 +38,8 @@ class PortfolioBacktestConfig:
     days: int = 500
     max_holding_days: int = 40
     max_positions: int = 10
-    position_size_pct: float = 0.08
+    position_size_pct: float = 0.12
+    target_gross_exposure_pct: float = 0.70
     initial_capital: float = 100_000.0
     use_market_momentum_overlay: bool = False
     defensive_exposure_cap: float = 0.50
@@ -246,6 +247,49 @@ def _market_momentum_states(benchmark: pd.DataFrame) -> pd.Series:
     return pd.Series(states.to_numpy(), index=benchmark["date"])
 
 
+def _annual_results(daily_states: list[dict], trades: list[Trade]) -> list[dict]:
+    """Summarize the continuous portfolio simulation by calendar year."""
+    if not daily_states:
+        return []
+
+    trades_by_year: dict[int, int] = {}
+    for trade in trades:
+        year = int(str(trade.exit_date)[:4])
+        trades_by_year[year] = trades_by_year.get(year, 0) + 1
+
+    results: list[dict] = []
+    grouped: dict[int, list[dict]] = {}
+    for state in daily_states:
+        grouped.setdefault(pd.Timestamp(state["date"]).year, []).append(state)
+
+    for year, states in sorted(grouped.items()):
+        equity = pd.Series([float(state["equity"]) for state in states], dtype=float)
+        qqq = pd.Series([float(state["qqq_close"]) for state in states], dtype=float)
+        drawdown = equity / equity.cummax() - 1
+        start_equity = float(equity.iloc[0])
+        end_equity = float(equity.iloc[-1])
+        start_qqq = float(qqq.iloc[0])
+        end_qqq = float(qqq.iloc[-1])
+        portfolio_return = (end_equity / start_equity - 1) * 100 if start_equity else 0.0
+        qqq_return = (end_qqq / start_qqq - 1) * 100 if start_qqq else 0.0
+        results.append({
+            "year": year,
+            "warmup_only": not any(bool(state["qqq_ma200_ready"]) for state in states),
+            "start": str(pd.Timestamp(states[0]["date"]).date()),
+            "end": str(pd.Timestamp(states[-1]["date"]).date()),
+            "portfolio_return_pct": round(float(portfolio_return), 2),
+            "qqq_return_pct": round(float(qqq_return), 2),
+            "excess_return_pct": round(float(portfolio_return - qqq_return), 2),
+            "portfolio_max_drawdown_pct": round(float(drawdown.min() * 100), 2),
+            "average_invested_pct": round(float(np.mean([state["invested_pct"] for state in states]) * 100), 2),
+            "max_invested_pct": round(float(max(state["invested_pct"] for state in states) * 100), 2),
+            "max_positions_used": max(int(state["holdings"]) for state in states),
+            "trade_count": trades_by_year.get(year, 0),
+            "trading_days": len(states),
+        })
+    return results
+
+
 def run_portfolio_backtest(
     config: PortfolioBacktestConfig,
     stock_list_file: str | Path = DEFAULT_STOCK_LIST,
@@ -254,6 +298,7 @@ def run_portfolio_backtest(
     if (
         config.max_positions < 1
         or not 0 < config.position_size_pct <= 1
+        or not 0 < config.target_gross_exposure_pct <= 1
         or not 0 <= config.risk_off_exposure_cap <= config.defensive_exposure_cap <= 1
         or config.initial_capital <= 0
     ):
@@ -358,7 +403,9 @@ def run_portfolio_backtest(
                 close_position(position, date, float(bar["open"]), reason)
                 equity_at_open = cash + gross_value
 
-        equity_at_open = cash + sum(position.shares * float(bars[position.symbol]["open"]) for position in positions.values() if position.symbol in bars)
+        gross_value = sum(position.shares * float(bars[position.symbol]["open"]) for position in positions.values() if position.symbol in bars)
+        equity_at_open = cash + gross_value
+        remaining_exposure = max(0.0, equity_at_open * config.target_gross_exposure_pct - gross_value)
         daily_candidates = sorted(candidates_by_date.get(date, []), reverse=True)
         candidates_considered += len(daily_candidates)
         for score, symbol, signal_index in daily_candidates:
@@ -370,12 +417,13 @@ def run_portfolio_backtest(
             bar = bars.get(symbol)
             if bar is None:
                 continue
-            allocation = min(equity_at_open * config.position_size_pct, cash)
+            allocation = min(equity_at_open * config.position_size_pct, cash, remaining_exposure)
             entry_price = float(bar["open"])
             if allocation <= 0 or entry_price <= 0:
                 continue
             shares = allocation / (entry_price * (1 + COMMISSION_RATE))
             cash -= shares * entry_price * (1 + COMMISSION_RATE)
+            remaining_exposure -= allocation
             signal = frames[symbol].iloc[signal_index]
             entry_setup = "accumulation" if bool(signal["accumulation_entry"]) else "expansion_breakout"
             positions[symbol] = OpenPosition(
@@ -513,6 +561,7 @@ def run_portfolio_backtest(
             "qqq_below_ma200_days": blocked_days,
         })
     summary = summarize_moon_trades(trades, benchmark_history)
+    annual_results = _annual_results(daily_states, trades)
     summary.update({
         "measurement": "Daily marked-to-market portfolio equity curve.",
         "portfolio_return_pct": round((cash / config.initial_capital - 1) * 100, 2),
@@ -525,6 +574,7 @@ def run_portfolio_backtest(
         "market_momentum_overlay": config.use_market_momentum_overlay,
         "flat_periods": flat_periods,
         "low_exposure_periods": low_exposure_periods,
+        "annual_results": annual_results,
         "symbols_tested": len(frames),
         "symbols_skipped": skipped,
         "survivorship_bias_note": "Uses the current static NASDAQ 100/QQQ-like universe for the full period.",
@@ -533,6 +583,7 @@ def run_portfolio_backtest(
     return {
         "summary": summary,
         "trades": [asdict(trade) for trade in trades],
+        "annual_results": annual_results,
         "daily_exposure": [
             {
                 "date": str(state["date"].date()),
@@ -554,6 +605,8 @@ def main() -> None:
     parser.add_argument("--days", type=int, default=500)
     parser.add_argument("--max-holding-days", type=int, default=40)
     parser.add_argument("--max-symbols", type=int, default=None)
+    parser.add_argument("--position-size-pct", type=float, default=0.12, help="Maximum allocation per new stock, e.g. 0.12")
+    parser.add_argument("--target-exposure-pct", type=float, default=0.70, help="Portfolio gross exposure cap, e.g. 0.70")
     parser.add_argument("--no-cache", action="store_true")
     parser.add_argument("--portfolio", action="store_true", help="Run the deployable capped portfolio simulation.")
     parser.add_argument(
@@ -569,6 +622,8 @@ def main() -> None:
                 days=args.days,
                 max_holding_days=args.max_holding_days,
                 max_symbols=args.max_symbols,
+                position_size_pct=args.position_size_pct,
+                target_gross_exposure_pct=args.target_exposure_pct,
                 use_cache=not args.no_cache,
                 use_market_momentum_overlay=args.market_momentum_overlay,
             )

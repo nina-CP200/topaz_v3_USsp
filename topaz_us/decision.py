@@ -5,7 +5,8 @@ from __future__ import annotations
 from typing import Any
 
 
-MAX_SINGLE_POSITION_PCT = 0.08
+MAX_SINGLE_POSITION_PCT = 0.12
+MAX_GROSS_POSITION_PCT = 0.70
 MAX_CANDIDATES = 10
 
 
@@ -75,7 +76,7 @@ def build_decision_snapshot(
     results = [dict(item) for item in analysis.get("results", analysis.get("all_results", []))]
     result_by_symbol = {_symbol(item): item for item in results}
     entry_allowed = bool(analysis.get("market_entry_allowed", analysis.get("qqq_above_ma200", False)))
-    gross_cap = _clamp(analysis.get("recommended_position", 0.0))
+    gross_cap = min(_clamp(analysis.get("recommended_position", 0.0)), MAX_GROSS_POSITION_PCT)
     target_by_symbol = _candidate_targets(results, entry_allowed, gross_cap)
     holding_by_symbol = {_symbol(item): item for item in holdings if _symbol(item)}
 

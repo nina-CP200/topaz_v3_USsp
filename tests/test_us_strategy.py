@@ -5,7 +5,7 @@ import unittest
 import pandas as pd
 
 from topaz_us.data.us_provider import _get_yfinance_proxy, _normalize_history
-from topaz_us.decision import MAX_SINGLE_POSITION_PCT, build_decision_snapshot
+from topaz_us.decision import MAX_GROSS_POSITION_PCT, MAX_SINGLE_POSITION_PCT, build_decision_snapshot
 from topaz_us.data.regime import classify_qqq_regime
 from topaz_us.strategy import build_cross_section_features, get_advice_from_score, score_stock, suggest_position
 
@@ -81,6 +81,25 @@ class USStrategyTests(unittest.TestCase):
         self.assertTrue(all(target <= MAX_SINGLE_POSITION_PCT for target in targets))
         self.assertLessEqual(sum(targets), 0.2)
 
+    def test_decision_caps_gross_target_at_seventy_percent(self):
+        results = [
+            {
+                "symbol": f"T{i}", "name": f"Test {i}", "rank": i,
+                "active_long_signal": True, "position_pct": 0.12,
+                "current_price": 100, "composite_score": 95,
+            }
+            for i in range(1, 11)
+        ]
+        snapshot = build_decision_snapshot({
+            "market_entry_allowed": True,
+            "qqq_above_ma200": True,
+            "recommended_position": 0.95,
+            "results": results,
+        }, [], 100_000)
+        targets = [candidate["target_pct"] for candidate in snapshot["candidates"]]
+        self.assertLessEqual(sum(targets), MAX_GROSS_POSITION_PCT)
+        self.assertTrue(all(target <= MAX_SINGLE_POSITION_PCT for target in targets))
+
     def test_decision_maps_five_holding_actions(self):
         base = {
             "market_entry_allowed": True,
@@ -96,7 +115,7 @@ class USStrategyTests(unittest.TestCase):
         snapshot = build_decision_snapshot(base, [
             {"symbol": "ADD", "shares": 10, "cost": 90},
             {"symbol": "EXIT", "shares": 10, "cost": 90},
-            {"symbol": "REDUCE", "shares": 100, "cost": 90},
+            {"symbol": "REDUCE", "shares": 130, "cost": 90},
             {"symbol": "HOLD", "shares": 20, "cost": 90},
         ], 100_000)
         actions = {holding["symbol"]: holding["action"] for holding in snapshot["holdings"]}

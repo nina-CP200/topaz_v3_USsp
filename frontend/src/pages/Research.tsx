@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Alert, Card, Col, Row, Spin, Statistic, Tag } from 'antd'
+import { Alert, Card, Col, Row, Spin, Table, Tag } from 'antd'
 import { ExperimentOutlined } from '@ant-design/icons'
 import ReactECharts from 'echarts-for-react'
 import { getLatestResearch } from '../api'
@@ -8,16 +8,23 @@ import type { ResearchResult, ResearchSnapshot } from '../api'
 const metric = (value: unknown, suffix = '%') => typeof value === 'number' ? `${value.toFixed(2)}${suffix}` : '-'
 
 function SummaryCard({ title, result, experimental = false }: { title: string; result: ResearchResult; experimental?: boolean }) {
-  const summary = result.summary
   return <Card title={<span>{title} {experimental && <Tag color="warning">实验性</Tag>}</span>} extra={<span className="card-meta">{result.source}</span>}>
-    <Row gutter={[12, 16]}>
-      <Col span={8}><Statistic title="组合收益" value={metric(summary.portfolio_return_pct)} valueStyle={{ color: Number(summary.portfolio_return_pct) >= 0 ? 'var(--teal)' : 'var(--coral)' }} /></Col>
-      <Col span={8}><Statistic title="最大回撤" value={metric(summary.portfolio_max_drawdown_pct)} valueStyle={{ color: 'var(--coral)' }} /></Col>
-      <Col span={8}><Statistic title="平均持仓" value={metric(summary.average_invested_pct)} /></Col>
-      <Col span={8}><Statistic title="交易数量" value={Number(summary.trade_count) || 0} /></Col>
-      <Col span={8}><Statistic title="最大持仓数" value={Number(summary.max_positions_used) || 0} /></Col>
-      <Col span={8}><Statistic title="样本股票" value={Number(summary.symbols_tested) || 0} /></Col>
-    </Row>
+    <Table
+      size="small"
+      pagination={false}
+      rowKey="year"
+      scroll={{ x: 760 }}
+      dataSource={result.annual_results}
+      columns={[
+        { title: '年份', dataIndex: 'year', width: 92, render: (_: number, row: ResearchResult['annual_results'][number]) => row.warmup_only ? `${row.year}（预热）` : row.year },
+        { title: '组合收益', dataIndex: 'portfolio_return_pct', render: (value: number) => <span className="data-value" style={{ color: value >= 0 ? 'var(--teal)' : 'var(--coral)' }}>{metric(value)}</span> },
+        { title: 'QQQ收益', dataIndex: 'qqq_return_pct', render: (value: number) => metric(value) },
+        { title: '相对QQQ', dataIndex: 'excess_return_pct', render: (value: number) => <span style={{ color: value >= 0 ? 'var(--teal)' : 'var(--coral)' }}>{metric(value)}</span> },
+        { title: '最大回撤', dataIndex: 'portfolio_max_drawdown_pct', render: (value: number) => <span style={{ color: 'var(--coral)' }}>{metric(value)}</span> },
+        { title: '平均投入', dataIndex: 'average_invested_pct', render: (value: number) => metric(value) },
+        { title: '交易数', dataIndex: 'trade_count' },
+      ]}
+    />
   </Card>
 }
 

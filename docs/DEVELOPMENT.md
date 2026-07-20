@@ -93,6 +93,8 @@ Keep these contracts stable unless the frontend and API schemas are updated toge
 
 Offline tests should use fixtures or generated DataFrames. Do not make unit tests depend on live yfinance calls.
 
+The portfolio backtest uses a 12% single-stock allocation cap and a 70% gross exposure cap by default. Its output includes `annual_results`, which reports each calendar year's portfolio return, QQQ return, relative return, drawdown, average invested capital, and trade count. The annual rows are slices of one continuous simulation, so positions and equity can carry across a year boundary. A year marked `warmup_only` only contains indicator warm-up data and should not be treated as an active strategy year.
+
 ## Updating The Universe
 
 The first version uses a static file:

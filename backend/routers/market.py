@@ -4,6 +4,7 @@ from fastapi import APIRouter, Query
 
 from topaz_us.data.market import get_index_data, get_index_history, get_market_adjusted_thresholds
 from topaz_us.data.regime import classify_qqq_regime
+from topaz_us.decision import MAX_GROSS_POSITION_PCT
 
 router = APIRouter()
 
@@ -34,7 +35,7 @@ def market_overview():
         "sentiment_limit_down": 0,
         "buy_threshold": thresholds.get("buy_threshold", 75),
         "sell_threshold": thresholds.get("sell_threshold", 50),
-        "position_max": thresholds.get("position_max", 0.25),
+        "position_max": min(thresholds.get("position_max", 0.25), MAX_GROSS_POSITION_PCT),
         "qqq_above_ma200": regime_info.get("qqq_above_ma200", False),
         "market_momentum_state": regime_info.get("market_momentum_state", "normal"),
         "market_entry_allowed": regime_info.get("market_entry_allowed", False),

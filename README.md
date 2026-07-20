@@ -37,7 +37,7 @@ Advice rules:
 - `35-65`: 建议观望
 - `< 35`: 建议回避
 
-Single-stock position cap is `8%`.
+Single-stock position cap is `12%`. The default research portfolio caps gross invested capital at `70%`, leaving the remainder in cash.
 
 ## Run
 
@@ -58,8 +58,8 @@ uv run python -m topaz_us.backtest.moon_liquidity --days 500 --max-holding-days 
 Save the current strategy research shown in the app:
 
 ```bash
-uv run python -m topaz_us.backtest.moon_liquidity --portfolio --days 500 --max-holding-days 40 --output data/raw/moon_portfolio_baseline.json
-uv run python -m topaz_us.backtest.moon_liquidity --portfolio --market-momentum-overlay --days 500 --max-holding-days 40 --output data/raw/moon_portfolio_momentum_overlay.json
+uv run python -m topaz_us.backtest.moon_liquidity --portfolio --days 500 --max-holding-days 40 --position-size-pct 0.12 --target-exposure-pct 0.70 --output data/raw/moon_portfolio_baseline.json
+uv run python -m topaz_us.backtest.moon_liquidity --portfolio --market-momentum-overlay --days 500 --max-holding-days 40 --position-size-pct 0.12 --target-exposure-pct 0.70 --output data/raw/moon_portfolio_momentum_overlay.json
 ```
 
 Query the latest results:

@@ -302,7 +302,7 @@ def suggest_position(
     composite_score: float,
     qqq_above_ma200: bool = True,
     active_long_signal: bool = False,
-    max_per_stock: float = 0.08,
+    max_per_stock: float = 0.12,
 ) -> float:
     if not active_long_signal or not qqq_above_ma200 or composite_score < 85:
         return 0.0
