@@ -72,7 +72,7 @@ export default function Portfolio() {
         { title: '当前 / 目标', key: 'weight', width: 130, render: (_: unknown, item: DecisionHolding) => <span className="data-value">{pct(item.current_pct)} <span className="muted-separator">/</span> {pct(item.target_pct)}</span> },
         { title: '调整金额', dataIndex: 'delta_value_usd', width: 105, render: (value: number) => <span className="data-value" style={{ color: value > 0 ? 'var(--teal)' : value < 0 ? 'var(--coral)' : 'var(--text-secondary)' }}>{value > 0 ? '+' : ''}{money(value)}</span> },
         { title: '止损', dataIndex: 'stop_loss', width: 82, render: (value: number) => <span className="data-value" style={{ color: 'var(--coral)' }}>{value ? `$${value.toFixed(2)}` : '-'}</span> },
-        { title: '理由', dataIndex: 'reasons', render: (items: string[], item: DecisionHolding) => <span className="reason-text">{item.action === 'reduce' ? '当前权重超过单股 8% 上限' : items?.[0] || '-'}</span> },
+        { title: '理由', dataIndex: 'reasons', render: (items: string[], item: DecisionHolding) => <span className="reason-text">{item.action === 'reduce' ? '当前权重超过单股 12% 上限' : items?.[0] || '-'}</span> },
       ]} /></Card></Col>
       <Col xs={24} xl={7}><Card title="行业暴露"><div className="allocation-list">{allocation.length ? allocation.map(item => <div key={item.sector}><div><span>{item.sector}</span><strong>{pct(item.pct)}</strong></div><div className="allocation-bar"><i style={{ width: `${Math.min(100, item.pct * 100)}%` }} /></div><small>{money(item.value)}</small></div>) : <div className="empty-decision">暂无可用持仓估值</div>}</div></Card></Col>
     </Row>

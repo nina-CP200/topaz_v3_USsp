@@ -20,11 +20,12 @@ def _read_backtest(path: Path) -> dict | None:
         with path.open(encoding="utf-8") as handle:
             payload = json.load(handle)
         summary = payload.get("summary", {})
-        if "portfolio_return_pct" not in summary:
+        if "portfolio_return_pct" not in summary and not payload.get("annual_results"):
             return None
         return {
             "source": path.name,
             "summary": summary,
+            "annual_results": payload.get("annual_results", summary.get("annual_results", [])),
             "daily_exposure": payload.get("daily_exposure", []),
         }
     except (OSError, json.JSONDecodeError):
