@@ -52,17 +52,20 @@ export default function AppLayout() {
           alignItems: 'center',
           gap: 10,
         }}>
-          <img
-            src="/topaz-logo.png"
-            alt="Topaz US"
-            style={{
+          <div style={{
             width: 32,
             height: 32,
             borderRadius: 'var(--radius-sm)',
-            objectFit: 'cover',
-            display: 'block',
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.35)',
-          }} />
+            background: 'linear-gradient(135deg, var(--accent), #c08a30)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 2px 8px rgba(212, 164, 76, 0.25)',
+          }}>
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+              <path d="M3 9L7.5 13.5L15 4.5" stroke="#0f0f0f" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </div>
           <div>
             <div style={{
               color: 'var(--text-primary)',
