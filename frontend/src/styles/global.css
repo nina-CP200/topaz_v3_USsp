@@ -645,6 +645,25 @@ body {
 .drawer-price span { margin-left: 8px; font-size: 14px; }
 .drawer-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 12px; background: var(--bg-elevated); border: 1px solid var(--border); }
 .score-breakdown { display: grid; gap: 8px; }
+.technical-indicators span { color: var(--text-secondary); }
+.horizon-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 16px 0 8px; }
+.market-scanner .ant-table-thead > tr > th { color: var(--text-secondary); }
+.horizon-toolbar > span, .indicator-caption { color: var(--text-secondary); font-size: 12px; line-height: 1.6; }
+.technical-signal { display: inline-block; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.signal-bullish { color: var(--teal); }
+.signal-bearish { color: var(--coral); }
+.signal-neutral { color: var(--accent); }
+.signal-unavailable { color: var(--text-secondary); }
+.indicator-table-cell { display: grid; gap: 4px; padding: 4px 0; }
+.horizon-verdict { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.horizon-verdict > span:last-child, .horizon-summary { color: var(--text-secondary); }
+.horizon-summary { line-height: 1.7; margin: 10px 0 20px; }
+.indicator-explanation { padding: 14px 0; border-top: 1px solid var(--border); }
+.indicator-heading { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 8px; }
+.indicator-heading h3 { margin: 0; color: var(--text-primary); font-size: 14px; }
+.indicator-explanation p { margin: 8px 0 0; color: var(--text-secondary); line-height: 1.7; }
+.moon-assessment { padding: 16px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.moon-assessment p { color: var(--text-secondary); line-height: 1.7; margin: 8px 0 0; }
 .score-breakdown h3,
 .reason-block h3 { margin: 0 0 2px; color: var(--text-secondary); font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; }
 .score-breakdown > div { display: flex; justify-content: space-between; border-bottom: 1px solid var(--border-subtle); padding-bottom: 6px; }

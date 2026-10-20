@@ -12,6 +12,7 @@ topaz_us/                 Python domain package
   utils/                  Small shared utilities
   portfolio.py            Portfolio analysis
   strategy.py             Moon accumulation entry and liquidity exit scoring
+  indicators.py           Williams %R, MACD, SMA crossover, and CCI for the scanner
 backend/                  FastAPI app and routers
 frontend/                 React + Vite dashboard
 config/                   Static NASDAQ 100 universe
@@ -94,6 +95,38 @@ Keep these contracts stable unless the frontend and API schemas are updated toge
 Offline tests should use fixtures or generated DataFrames. Do not make unit tests depend on live yfinance calls.
 
 The portfolio backtest uses a 12% single-stock allocation cap and a 70% gross exposure cap by default. Its output includes `annual_results`, which reports each calendar year's portfolio return, QQQ return, relative return, drawdown, average invested capital, and trade count. The annual rows are slices of one continuous simulation, so positions and equity can carry across a year boundary. A year marked `warmup_only` only contains indicator warm-up data and should not be treated as an active strategy year.
+
+## Updating Scanner Indicators
+
+The scanner's displayed indicators and directional explanations are calculated in `topaz_us/indicators.py`. `HORIZON_PROFILES` defines separate short/medium/long daily-bar parameters. `interpret_indicators()` produces per-indicator directions and reasons, and `summarize_signals()` applies the explicit three-of-four agreement rule. Missing any signal makes the summary unavailable. `latest_indicators()` includes all three profiles under `technical_analysis`, alongside the original medium-profile numeric fields. `build_indicator_frame()` sorts daily OHLCV bars by date and produces causal series; `latest_indicators()` returns the latest values rounded to four decimal places and converts undefined numeric values to `None` for JSON. Empty history returns an empty dictionary.
+
+Keep these layers aligned when changing a parameter or field:
+
+- `topaz_us/indicators.py`: formulas and crossover states.
+- `topaz_us/analysis/daily.py`: adds indicator values to each stock in new analysis snapshots.
+- `backend/routers/analysis.py`: supplements old snapshots from the local parquet cache through the saved analysis date.
+- `backend/schemas.py` and `frontend/src/api/index.ts`: nullable numeric fields and crossover state.
+- `frontend/src/pages/Stocks.tsx`: conclusion labels, hover explanations, Moon assessment, and period detail tabs.
+- `docs/INDICATORS.md`: calculation and API contract.
+
+The four-indicator horizon calculation is independent of `build_signal_frame()` and does not change strategy scoring or backtest rules. Keep the MACD display convention explicit: its histogram is `DIF − DEA`, without the factor of two used by some platforms. MA20 and MA50 here are simple averages, distinct from the strategy's 21/55/144 TMA.
+
+Old-snapshot supplementation happens in the daily GET response only. Do not use later bars or fetch live quotes to fill an old record. Preserve its date and file; absent data must remain visibly unavailable. Legacy snapshots are not persistently migrated, so changing indicator parameters also changes their calculated display on subsequent reads. Bump `ANALYSIS_VERSION` when changing profiles or interpretation rules, and `MOON_ANALYSIS_VERSION` when changing Moon interpretation. The API skips supplementation only when both versions and the saved Moon QQQ gate state match. `build_moon_assessment()` reuses `strategy.build_signal_frame()`; keep exit warnings and structure weakness ahead of entry setups, and distinguish a first trigger from a continuing setup. Moon needs the same full trend warm-up as cross-section scoring and is not included in the horizon vote.
+
+Run the focused offline checks:
+
+```bash
+uv run python -m unittest tests.test_indicators -v
+cd frontend
+npm run build
+npm run lint
+```
+
+If the virtual environment already has the runtime dependencies, `.venv/bin/python -m unittest tests.test_indicators -v` is an alternative from the repository root. The suite uses `unittest`; pytest is not required. The scanner presents conclusions, not raw technical values; numbers remain in the API for calculation and compatibility. The removed strategy research UI and API must not be reintroduced when changing navigation. Offline backtest scripts and stored results remain available.
+
+The indicator tests cover formulas, crossing-day behavior, undefined ranges, causality, the old-snapshot date cutoff, profile parameters and directions, reversal trigger handling, mixed/unavailable summaries, JSON safety, and long-horizon warm-up.
+
+`make check` includes Python compilation, unit tests, and the frontend build. Run frontend lint separately; it is not part of that target.
 
 ## Updating The Universe
 

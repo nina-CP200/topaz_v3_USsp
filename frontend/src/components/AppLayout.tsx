@@ -3,7 +3,6 @@ import {
   DashboardOutlined,
   StockOutlined,
   WalletOutlined,
-  ExperimentOutlined,
   SettingOutlined,
 } from '@ant-design/icons'
 
@@ -11,7 +10,6 @@ const navItems = [
   { path: '/dashboard', icon: <DashboardOutlined />, label: '每日决策' },
   { path: '/stocks', icon: <StockOutlined />, label: '市场扫描' },
   { path: '/portfolio', icon: <WalletOutlined />, label: '我的组合' },
-  { path: '/research', icon: <ExperimentOutlined />, label: '策略研究' },
   { path: '/settings', icon: <SettingOutlined />, label: '设置' },
 ]
 
@@ -19,7 +17,6 @@ const pageTitleMap: Record<string, string> = {
   '/dashboard': '每日决策',
   '/stocks': '市场扫描',
   '/portfolio': '我的组合',
-  '/research': '策略研究',
   '/settings': '设置',
 }
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 from pydantic import BaseModel
-from typing import Optional
+from typing import Literal, Optional
 
 
 class HoldingItem(BaseModel):
@@ -18,7 +18,51 @@ class PortfolioAnalyzeRequest(BaseModel):
     holdings: list[HoldingItem]
 
 
+class TechnicalSignal(BaseModel):
+    direction: Literal["bullish", "bearish", "neutral", "unavailable"]
+    reason: str
+
+
+class TechnicalSummary(TechnicalSignal):
+    counts: dict[str, int]
+
+
+class HorizonAnalysis(BaseModel):
+    label: str
+    window: str
+    parameters: dict[str, int | list[int]]
+    values: dict[str, float | str | None]
+    signals: dict[str, TechnicalSignal]
+    summary: TechnicalSummary
+
+
+class TechnicalAnalysis(BaseModel):
+    version: int
+    as_of: str
+    bars: int
+    horizons: dict[str, HorizonAnalysis]
+
+
+class MoonAnalysis(TechnicalSignal):
+    version: int
+    label: str
+    setup: Literal["none", "accumulation", "expansion", "both"]
+    triggered: bool
+    market_entry_allowed: bool | None = None
+    as_of: str | None = None
+
+
 class StockResultItem(BaseModel):
+    moon_analysis: MoonAnalysis | None = None
+    technical_analysis: TechnicalAnalysis | None = None
+    williams_r: float | None = None
+    macd: float | None = None
+    macd_signal: float | None = None
+    macd_hist: float | None = None
+    ma20: float | None = None
+    ma50: float | None = None
+    ma_cross: str = "unavailable"
+    cci: float | None = None
     symbol: str
     name: str
     industry: str

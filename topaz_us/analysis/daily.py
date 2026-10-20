@@ -10,6 +10,7 @@ from typing import Dict
 
 from topaz_us.data.regime import classify_qqq_regime
 from topaz_us.data.sentiment import get_market_sentiment
+from topaz_us.indicators import latest_indicators
 from topaz_us.data.us_provider import get_history_data, load_histories, load_us_stock_list
 from topaz_us.strategy import (
     build_cross_section_features,
@@ -59,6 +60,7 @@ def analyze_stocks(stock_list_file: str | os.PathLike = DEFAULT_STOCK_LIST) -> D
             advice = get_advice_from_score(breakdown.composite_score, market_entry_allowed, active_long_signal)
             position_pct = suggest_position(breakdown.composite_score, market_entry_allowed, active_long_signal)
             results.append({
+                **latest_indicators(histories[symbol], market_entry_allowed),
                 "symbol": symbol,
                 "name": meta.get(symbol, {}).get("name", symbol),
                 "sector": meta.get(symbol, {}).get("sector", ""),

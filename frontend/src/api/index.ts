@@ -35,14 +35,53 @@ export interface KLineItem {
   volume: number
 }
 
+export type SignalDirection = 'bullish' | 'bearish' | 'neutral' | 'unavailable'
+export type HorizonKey = 'short' | 'medium' | 'long'
+export interface TechnicalSignal {
+  direction: SignalDirection
+  reason: string
+}
+export interface HorizonAnalysis {
+  label: string
+  window: string
+  parameters: { williams: number; macd: [number, number, number]; ma: [number, number]; cci: number }
+  values: { williams_r: number | null; macd: number | null; macd_signal: number | null; macd_hist: number | null; ma_fast: number | null; ma_slow: number | null; ma_cross: string; cci: number | null }
+  signals: Record<'williams' | 'macd' | 'ma' | 'cci', TechnicalSignal>
+  summary: TechnicalSignal & { counts: Record<SignalDirection, number> }
+}
+export interface TechnicalAnalysis {
+  version: number
+  as_of: string
+  bars: number
+  horizons: Record<HorizonKey, HorizonAnalysis>
+}
+
+export interface MoonAnalysis extends TechnicalSignal {
+  version: number
+  label: string
+  setup: 'none' | 'accumulation' | 'expansion' | 'both'
+  triggered: boolean
+  market_entry_allowed: boolean | null
+  as_of?: string
+}
+
 export interface StockResult {
+  moon_analysis?: MoonAnalysis
+  technical_analysis?: TechnicalAnalysis
   symbol: string
   name: string
   industry: string
   sector: string
   current_price: number
   change_pct: number
-  probability: number
+  williams_r?: number | null
+  macd?: number | null
+  macd_signal?: number | null
+  macd_hist?: number | null
+  ma20?: number | null
+  ma50?: number | null
+  ma_cross?: string
+  cci?: number | null
   composite_score: number
   signal_status?: string
   bullish_sweep?: boolean
@@ -62,9 +101,7 @@ export interface StockResult {
   reasons: string[]
   advice: string
   position_pct: number
-  model_confidence: number
   rank: number
-  predicted_return: number
   risk_level: string
   trend_score?: number
   signal_score?: number
@@ -79,7 +116,6 @@ export interface StockResult {
 export interface DailyAnalysis {
   date: string
   market_regime: string
-  model_confidence: number
   advance_ratio: number
   recommended_position: number
   total_stocks: number
@@ -168,34 +204,6 @@ export interface DecisionSettings {
   investable_capital_usd: number
 }
 
-export interface ResearchResult {
-  source: string
-  summary: Record<string, unknown>
-  annual_results: Array<{
-    year: number
-    warmup_only: boolean
-    start: string
-    end: string
-    portfolio_return_pct: number
-    qqq_return_pct: number
-    excess_return_pct: number
-    portfolio_max_drawdown_pct: number
-    average_invested_pct: number
-    max_invested_pct: number
-    max_positions_used: number
-    trade_count: number
-    trading_days: number
-  }>
-  daily_exposure: Array<{ date: string; invested_pct: number; equity: number; holdings: number; qqq_above_ma200: boolean; market_momentum_state: string }>
-}
-
-export interface ResearchSnapshot {
-  available: boolean
-  baseline: ResearchResult | null
-  momentum_overlay: ResearchResult | null
-  message: string
-}
-
 export interface HoldingItem {
   symbol: string
   name?: string
@@ -263,11 +271,6 @@ export async function getDecisionSettings(): Promise<DecisionSettings> {
 
 export async function saveDecisionSettings(settings: DecisionSettings): Promise<DecisionSettings> {
   const r = await api.put('/settings/decision', settings)
-  return r.data
-}
-
-export async function getLatestResearch(): Promise<ResearchSnapshot> {
-  const r = await api.get('/research/latest')
   return r.data
 }
 
