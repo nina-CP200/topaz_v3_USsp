@@ -4,12 +4,15 @@ import os
 import threading
 from datetime import datetime
 import requests
+import pandas as pd
 from fastapi import APIRouter, HTTPException, Query
 from topaz_us.analysis.query import load_analysis_results
 from topaz_us.analysis.daily import analyze_stocks
 from topaz_us.decision import MAX_GROSS_POSITION_PCT
 from topaz_us.reports.sender import build_score_ranking_blocks
 from backend.routers.common import PROJECT_ROOT, patch_results
+from topaz_us.data.us_provider import HISTORY_DIR, normalize_symbol
+from topaz_us.indicators import ANALYSIS_VERSION, MOON_ANALYSIS_VERSION, latest_indicators
 
 router = APIRouter()
 
@@ -44,6 +47,25 @@ def daily_analysis():
     qqq_above_ma200 = data.get("qqq_above_ma200", True)
     results = data.get("results", data.get("all_results", []))
     data["results"] = patch_results(results, regime, qqq_above_ma200)
+    # Upgrade old snapshots using only locally cached bars through their date.
+    for item in data["results"]:
+        if ((item.get("technical_analysis") or {}).get("version") == ANALYSIS_VERSION
+                and (item.get("moon_analysis") or {}).get("version") == MOON_ANALYSIS_VERSION
+                and (item.get("moon_analysis") or {}).get("market_entry_allowed") == qqq_above_ma200):
+            continue
+        symbol = normalize_symbol(item.get("symbol", ""))
+        if not symbol or any(char not in "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-^=" for char in symbol):
+            continue
+        path = HISTORY_DIR / f"{symbol}.parquet"
+        if not path.exists() or not data.get("date"):
+            continue
+        try:
+            history = pd.read_parquet(path)
+            cutoff = pd.Timestamp(str(data["date"])[:10]).date()
+            history = history[pd.to_datetime(history["date"]).dt.date <= cutoff]
+            item.update(latest_indicators(history, qqq_above_ma200))
+        except (OSError, ValueError, KeyError):
+            continue
     return data
 
 

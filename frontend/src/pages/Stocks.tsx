@@ -1,18 +1,44 @@
 import { useEffect, useRef, useState } from 'react'
-import { Button, Drawer, Input, Modal, Progress, Segmented, Select, Space, Spin, Table, message } from 'antd'
+import { Button, Drawer, Input, Modal, Progress, Segmented, Select, Space, Spin, Table, Tabs, Tooltip, message } from 'antd'
 import { FileTextOutlined, ReloadOutlined, SearchOutlined } from '@ant-design/icons'
 import { getAnalysisReport, getAnalysisStatus, getDailyAnalysis, refreshAnalysis } from '../api'
-import type { DailyAnalysis, StockResult } from '../api'
+import type { DailyAnalysis, HorizonAnalysis, HorizonKey, StockResult, TechnicalSignal, MoonAnalysis } from '../api'
 
-const signalColor = (stock: StockResult) => stock.bearish_sweep ? 'var(--coral)' : stock.active_long_signal ? 'var(--teal)' : stock.signal_status === 'Market Hold' ? 'var(--accent)' : 'var(--text-muted)'
-const pct = (value?: number) => value == null ? '-' : `${(value * 100).toFixed(0)}%`
+const periods: HorizonKey[] = ['short', 'medium', 'long']
+const periodLabels = { short: '短期', medium: '中期', long: '长期' }
+const directionLabels = { bullish: '看涨', bearish: '看跌', neutral: '中性', unavailable: '数据不足' }
+function Signal({ signal, mixed = false }: { signal?: TechnicalSignal; mixed?: boolean }) {
+  const direction = signal?.direction || 'unavailable'
+  return <Tooltip title={signal?.reason || '暂无该周期分析，请刷新分析以更新记录。'}><span className={`technical-signal signal-${direction}`}>{mixed && direction === 'neutral' ? '中性 / 分歧' : directionLabels[direction]}</span></Tooltip>
+}
+const indicatorRows = [
+  { key: 'williams' as const, label: '威廉 %R' },
+  { key: 'macd' as const, label: 'MACD' },
+  { key: 'ma' as const, label: 'MA 交叉' },
+  { key: 'cci' as const, label: 'CCI' },
+]
+function MoonConclusion({ analysis }: { analysis?: MoonAnalysis }) {
+  return <Tooltip title={analysis?.reason || '暂无 Moon 判断，请刷新分析。'}><span className={`technical-signal signal-${analysis?.direction || 'unavailable'}`}>{analysis?.label || '数据不足'}{analysis?.direction === 'bullish' || analysis?.direction === 'bearish' ? ` · ${directionLabels[analysis.direction]}` : ''}</span></Tooltip>
+}
+function HorizonDetail({ analysis }: { analysis?: HorizonAnalysis }) {
+  if (!analysis) return <p>暂无该周期分析。请刷新分析以生成记录。</p>
+  return <div className="horizon-detail">
+    <div className="horizon-verdict"><Signal mixed signal={analysis.summary} /><span>{analysis.window} · 日线参数组</span></div>
+    <p className="horizon-summary">{analysis.summary.reason}</p>
+    {indicatorRows.map(row => <section className="indicator-explanation" key={row.key}>
+      <div className="indicator-heading"><h3>{row.label}</h3><Signal signal={analysis.signals[row.key]} /></div>
+      <p>{analysis.signals[row.key].reason}</p>
+    </section>)}
+  </div>
+}
 
 export default function Stocks() {
   const [data, setData] = useState<DailyAnalysis | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [progress, setProgress] = useState(0)
-  const [view, setView] = useState<string>('active')
+  const [horizon, setHorizon] = useState<HorizonKey>('medium')
+  const [view, setView] = useState<string>('all')
   const [search, setSearch] = useState('')
   const [sector, setSector] = useState<string | undefined>()
   const [selected, setSelected] = useState<StockResult | null>(null)
@@ -56,19 +82,20 @@ export default function Stocks() {
   })
 
   const columns = [
-    { title: '#', dataIndex: 'rank', width: 52, sorter: (a: StockResult, b: StockResult) => a.rank - b.rank },
-    { title: 'Ticker', dataIndex: 'symbol', width: 98, render: (value: string) => <strong className="data-value">{value}</strong> },
-    { title: '名称', dataIndex: 'name', width: 136 },
-    { title: '行业', dataIndex: 'sector', width: 155 },
+    { title: '#', dataIndex: 'rank', width: 44, sorter: (a: StockResult, b: StockResult) => a.rank - b.rank },
+    { title: 'Ticker', dataIndex: 'symbol', width: 82, render: (value: string) => <strong className="data-value">{value}</strong> },
+    { title: '名称', dataIndex: 'name', width: 120 },
     { title: '价格', dataIndex: 'current_price', width: 92, render: (value: number) => <span className="data-value">${value?.toFixed(2)}</span> },
     { title: '日变动', dataIndex: 'change_pct', width: 90, sorter: (a: StockResult, b: StockResult) => a.change_pct - b.change_pct, render: (value: number) => <span className="data-value" style={{ color: value >= 0 ? 'var(--teal)' : 'var(--coral)' }}>{value >= 0 ? '+' : ''}{value?.toFixed(2)}%</span> },
-    { title: '状态', key: 'status', width: 118, render: (_: unknown, item: StockResult) => <span className="signal-cell" style={{ color: signalColor(item) }}>{item.signal_status || 'No Signal'}</span> },
-    { title: '评分', dataIndex: 'composite_score', width: 82, sorter: (a: StockResult, b: StockResult) => a.composite_score - b.composite_score, render: (value: number) => <span className="data-value">{value?.toFixed(1)}</span> },
-    { title: '建议仓位', dataIndex: 'position_pct', width: 96, render: (value: number) => <span className="data-value">{pct(value)}</span> },
-    { title: '入场 / 止损', key: 'levels', width: 148, render: (_: unknown, item: StockResult) => <span className="data-value">{item.entry_price ? `$${item.entry_price.toFixed(2)}` : '-'} <span className="muted-separator">/</span> <span style={{ color: 'var(--coral)' }}>{item.stop_loss ? `$${item.stop_loss.toFixed(2)}` : '-'}</span></span> },
+    { title: 'Moon Accumulation', key: 'moon', width: 155, render: (_: unknown, item: StockResult) => <MoonConclusion analysis={item.moon_analysis} /> },
+    ...periods.map(period => ({ title: `${periodLabels[period]}判断`, key: period, width: 116, render: (_: unknown, item: StockResult) => <Signal mixed signal={item.technical_analysis?.horizons[period]?.summary} /> })),
+    ...indicatorRows.map(row => ({
+      title: row.label, key: row.key, width: 112,
+      render: (_: unknown, item: StockResult) => <Signal signal={item.technical_analysis?.horizons[horizon]?.signals[row.key]} />,
+    })),
   ]
 
-  return <div>
+  return <div className="market-scanner">
     {refreshing && <div className="analysis-progress"><Progress percent={progress} size="small" showInfo={false} /><span>正在更新扫描结果…</span></div>}
     <div className="scanner-toolbar">
       <Segmented value={view} onChange={value => setView(String(value))} options={[{ label: '可建仓', value: 'active' }, { label: '等待市场', value: 'blocked' }, { label: '退出预警', value: 'exit' }, { label: '全量股票池', value: 'all' }]} />
@@ -79,15 +106,17 @@ export default function Stocks() {
         <Button type="primary" icon={<ReloadOutlined />} loading={refreshing} onClick={refresh}>刷新分析</Button>
       </Space>
     </div>
-    <div className="scanner-summary"><span>{view === 'active' ? '仅显示通过 QQQ 市场门槛的有效入场信号。' : '点击任意行查看评分、触发条件和风险理由。'}</span><strong>{filtered.length} / {results.length}</strong></div>
-    {loading ? <Spin size="large" style={{ display: 'block', marginTop: 100 }} /> : <Table dataSource={filtered} columns={columns} rowKey="symbol" size="small" pagination={{ pageSize: 50, showSizeChanger: false }} scroll={{ x: 1100 }} onRow={item => ({ onClick: () => setSelected(item), style: { cursor: 'pointer' } })} />}
+    <div className="horizon-toolbar"><Segmented aria-label="指标分析周期" value={horizon} onChange={value => setHorizon(value as HorizonKey)} options={periods.map(value => ({ label: `${periodLabels[value]}指标`, value }))} /><span>短期约 1–4 周 · 中期约 1–3 个月 · 长期约 3–12 个月；均以日线分别计算</span></div>
+    <div className="scanner-summary"><span>{view === 'active' ? '仅显示通过 QQQ 市场门槛的有效入场信号。' : 'Moon 显示日线形态结论；四项技术指标显示当前所选周期的方向。悬停或点击股票查看依据。'}</span><strong>{data?.date || '暂无分析记录'} · {filtered.length} / {results.length}</strong></div>
+    {loading ? <Spin size="large" style={{ display: 'block', marginTop: 100 }} /> : <Table dataSource={filtered} columns={columns} rowKey="symbol" size="small" pagination={{ pageSize: 50, showSizeChanger: false }} scroll={{ x: 1380 }} onRow={item => ({ onClick: () => setSelected(item), style: { cursor: 'pointer' } })} />}
 
-    <Drawer title={selected ? `${selected.symbol} · ${selected.name}` : ''} open={Boolean(selected)} onClose={() => setSelected(null)} width={440}>
+    <Drawer title={selected ? `${selected.symbol} · ${selected.name}` : ''} open={Boolean(selected)} onClose={() => setSelected(null)} width="min(620px, 100vw)">
       {selected && <div className="stock-drawer">
         <div className="drawer-price">${selected.current_price.toFixed(2)} <span style={{ color: selected.change_pct >= 0 ? 'var(--teal)' : 'var(--coral)' }}>{selected.change_pct >= 0 ? '+' : ''}{selected.change_pct.toFixed(2)}%</span></div>
-        <div className="drawer-grid"><div><span>综合评分</span><strong>{selected.composite_score.toFixed(1)}</strong></div><div><span>建议仓位</span><strong>{pct(selected.position_pct)}</strong></div><div><span>入场价</span><strong>{selected.entry_price ? `$${selected.entry_price.toFixed(2)}` : '-'}</strong></div><div><span>初始止损</span><strong style={{ color: 'var(--coral)' }}>{selected.stop_loss ? `$${selected.stop_loss.toFixed(2)}` : '-'}</strong></div></div>
-        <div className="score-breakdown"><h3>评分构成</h3>{[['趋势', selected.trend_score], ['入场信号', selected.signal_score], ['成交量', selected.volume_score], ['波动率', selected.volatility_score], ['相对强弱', selected.relative_strength_score], ['动量', selected.momentum_score], ['风险扣分', selected.risk_penalty]].map(([label, value]) => <div key={String(label)}><span>{label}</span><strong>{typeof value === 'number' ? value.toFixed(1) : '-'}</strong></div>)}</div>
-        <div className="reason-block"><h3>策略理由</h3>{selected.reasons?.length ? selected.reasons.map(reason => <p key={reason}>{reason}</p>) : <p>暂无额外说明。</p>}</div>
+        <div className="indicator-caption">行情截至 {selected.technical_analysis?.as_of || '暂无'} · {selected.technical_analysis?.bars ?? 0} 根日线 · 分析记录 {data?.date || '暂无'}</div>
+        <section className="moon-assessment"><div className="indicator-heading"><h3>Moon Accumulation · 日线形态</h3><MoonConclusion analysis={selected.moon_analysis} /></div><p>{selected.moon_analysis?.reason || '暂无 Moon 判断，请刷新分析。'}</p></section>
+        <Tabs key={selected.symbol} defaultActiveKey={horizon} items={periods.map(period => ({ key: period, label: <span>{periodLabels[period]} <Signal mixed signal={selected.technical_analysis?.horizons[period]?.summary} /></span>, children: <HorizonDetail analysis={selected.technical_analysis?.horizons[period]} /> }))} />
+        <div className="reason-block"><h3>判断规则</h3><p>四项指标至少三项同向才给出该周期看涨或看跌；否则为中性 / 分歧。任一项数据不足时，该周期不作综合判断。长期均线交叉至少需要 201 根日线。</p><p>这些周期是本工具的观察范围与参数约定，不是收益预测。超买不自动等于看跌，超卖不自动等于看涨。Moon 单独沿用现有日线策略，优先提示退出风险，并检查 QQQ 市场门槛；不计入四项技术指标的周期投票。</p><p>“当日”指行情截至日期。旧记录按原分析日期补算；缺少行情时请刷新分析。</p></div>
       </div>}
     </Drawer>
     <Modal title="每日研究报告" open={reportOpen} onCancel={() => setReportOpen(false)} footer={null} width={760}><pre className="report-preview">{report}</pre></Modal>
