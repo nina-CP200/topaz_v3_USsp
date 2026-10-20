@@ -2,6 +2,7 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import {
   DashboardOutlined,
   StockOutlined,
+  StarOutlined,
   WalletOutlined,
   SettingOutlined,
 } from '@ant-design/icons'
@@ -9,6 +10,7 @@ import {
 const navItems = [
   { path: '/dashboard', icon: <DashboardOutlined />, label: '每日决策' },
   { path: '/stocks', icon: <StockOutlined />, label: '市场扫描' },
+  { path: '/watchlist', icon: <StarOutlined />, label: '我的自选' },
   { path: '/portfolio', icon: <WalletOutlined />, label: '我的组合' },
   { path: '/settings', icon: <SettingOutlined />, label: '设置' },
 ]
@@ -16,6 +18,7 @@ const navItems = [
 const pageTitleMap: Record<string, string> = {
   '/dashboard': '每日决策',
   '/stocks': '市场扫描',
+  '/watchlist': '我的自选',
   '/portfolio': '我的组合',
   '/settings': '设置',
 }

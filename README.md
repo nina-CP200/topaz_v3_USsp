@@ -23,6 +23,12 @@ Existing snapshots without the current technical-analysis or Moon assessment ver
 
 See [Indicator Reference](docs/INDICATORS.md) for formulas, API fields, crossover states, and compatibility details.
 
+## Watchlist
+
+Click the star beside a stock in the scanner, or use the favorite button in its detail drawer, to add or remove it from your watchlist. Use **仅看自选** in the scanner or open **我的自选** (`/watchlist`) from the sidebar. The watchlist shares the scanner's search, sector/status filters, technical conclusions, Moon assessment, and refresh controls.
+
+Favorites are saved locally in `data/raw/watchlist.json` and survive page reloads and server restarts on the same installation. Use **搜索 / 添加标的** to search US stocks/ETFs by code or English name, or add a complete ticker directly. Outside-universe symbols are validated against available daily history and receive separate on-demand analysis. This does not expand the original NASDAQ decision candidate universe or change holdings and position sizing. Saved symbols without analysis remain in the list, with a notice and a removal action. Saving failures leave the displayed selection unchanged and offer a retry; read failures preserve the original file and disable changes until loading succeeds.
+
 ## Strategy
 
 - Universe: static `config/nasdaq100_stocks.json`
@@ -130,6 +136,11 @@ Project documentation:
 - `GET /api/analysis/status`
 - `GET /api/analysis/report`
 - `GET /api/decision/daily`
+- `GET /api/watchlist/search?q=...`
+- `GET /api/watchlist/analysis`
+- `GET /api/watchlist`
+- `PUT /api/watchlist/{symbol}`
+- `DELETE /api/watchlist/{symbol}`
 - `GET /api/portfolio`
 - `PUT /api/portfolio`
 - `POST /api/portfolio/analyze`

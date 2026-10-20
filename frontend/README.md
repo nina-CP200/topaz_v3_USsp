@@ -23,6 +23,7 @@ For a production-like local run, `./start.sh` from the repository root builds th
 | --- | --- |
 | `/dashboard` | Daily decisions, QQQ market gate, candidate allocations, and urgent holding actions |
 | `/stocks` | Full stock universe, four technical indicators, strategy-status filters, and stock details |
+| `/watchlist` | Saved favorites with the same filters, conclusions, and stock detail drawer |
 | `/portfolio` | Local holdings and portfolio analysis |
 | `/settings` | Investable capital and other local settings |
 
@@ -36,11 +37,19 @@ The indicator columns show conclusions only: bullish, bearish, neutral, or unava
 
 A separate Moon Accumulation column and detail section consume `moon_analysis` and show the original daily strategy's named conclusion: trigger, continuation, waiting for market/setup, structural weakness, or exit warning. Moon is shared across period tabs and is not added to the four-indicator vote. Its source is the same `build_signal_frame()` used by the strategy, with the saved QQQ market gate applied.
 
-The summary shows the saved analysis timestamp and filtered/total counts. “当日金叉” and “当日死叉” refer to the analysis bar, not necessarily today's date. Reloading the page reads the saved snapshot; **刷新分析** starts a new backend analysis and polls `/api/analysis/status` for completion.
+The scanner summary shows its saved analysis timestamp and filtered/total counts. Watchlist summaries refer to each symbol's actual data cutoff because external analysis is computed on demand; the drawer shows its computation time separately from its last bar date. “当日金叉” and “当日死叉” refer to the analysis bar, not necessarily today's date. Reloading the page reads the saved snapshot; **刷新分析** starts a new backend analysis and polls `/api/analysis/status` for completion.
 
 The scanner does not display ML predictions, model confidence, score breakdowns, suggested position sizes, or entry/stop prices. The decision dashboard and other strategy pages still use the existing Moon strategy. Backend compatibility fields may remain in old payloads without being part of the scanner's display contract.
 
 See the [Indicator Reference](../docs/INDICATORS.md) for field names, formulas, formatting, and local-cache supplementation of old snapshots.
+
+## Watchlist
+
+The scanner has a star button per row and in the detail drawer, plus a **仅看自选** switch and a **搜索 / 添加标的** modal. The modal supports ticker/English-name lookup and direct ticker entry, including symbols outside NASDAQ 100. The sidebar's **我的自选** route reuses `Stocks` in watchlist-only mode. The two routes mount independently so their filter state does not leak across navigation.
+
+Search uses `GET /api/watchlist/search?q=...`; the modal shows provider warnings and supports direct-code addition when search is unavailable. External analysis loads from `GET /api/watchlist/analysis` and is merged into watchlist views, with separate loading and retry states. Favorites load from `GET /api/watchlist`; additions use `PUT /api/watchlist/{symbol}`, and removals use `DELETE /api/watchlist/{symbol}`. Changes are shown only after the server confirms persistence. Mutation controls stay disabled while a save is pending, and clicking a star does not open the row drawer. The button exposes its symbol and selected state through accessible labels and `aria-pressed`.
+
+A read failure shows a retry action and disables favorite changes. A write failure preserves the visible selection. Empty watchlists explain how to add stocks, with a link to the scanner. Saved symbols missing from the current analysis are retained and listed separately with removal controls; they are not silently dropped.
 
 ## Checks
 

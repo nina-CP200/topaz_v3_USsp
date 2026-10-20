@@ -142,6 +142,12 @@ Update it manually when NASDAQ 100 constituents change. Keep each item shaped as
 {"code": "AAPL", "name": "Apple", "sector": "Information Technology"}
 ```
 
+## Watchlist Changes
+
+Keep `backend/routers/watchlist.py`, the watchlist client functions in `frontend/src/api/index.ts`, and `Stocks` favorites controls aligned. The watchlist storage API returns a `symbols` array. Additions outside the configured universe are validated by `get_history_data()`. `GET /api/watchlist/search?q=...` merges local matches with US equity/ETF search results from yfinance; upstream failure returns a warning and local matches. `GET /api/watchlist/analysis` computes price, four-indicator horizons and Moon assessments for external favorites, with explicit failed-symbol reporting. This separate path does not write the daily NASDAQ snapshot or produce portfolio allocations. Use per-symbol mutations rather than replacing the whole list, and keep the atomic-write and error-preservation behavior. The current lock covers a single backend process.
+
+Run `uv run python -m unittest tests.test_watchlist -v` for persistence, normalization, duplicate handling, removal, input validation, corrupt-file protection, and failed-write checks. Tests use a temporary directory. For browser verification, check add/remove in both list and drawer, the watchlist-only route, reload persistence, empty states, and failed reads/writes. Do not leave synthetic favorites in the user's saved list after testing.
+
 ## Runtime Files
 
 These are intentionally ignored by Git:
@@ -150,6 +156,7 @@ These are intentionally ignored by Git:
 - `data/raw/latest_analysis_results.json`
 - `data/raw/analysis_status.json`
 - `data/raw/portfolio.json`
+- `data/raw/watchlist.json`
 - `data/raw/slack_configs.json`
 - `frontend/dist/`
 - `frontend/node_modules/`
