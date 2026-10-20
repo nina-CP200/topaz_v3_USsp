@@ -63,7 +63,8 @@ export default function App() {
           <Route element={<AppLayout />}>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/stocks" element={<Stocks />} />
+            <Route path="/stocks" element={<Stocks key="stocks" />} />
+            <Route path="/watchlist" element={<Stocks key="watchlist" watchlistOnly />} />
             <Route path="/portfolio" element={<Portfolio />} />
             <Route path="/research" element={<Navigate to="/stocks" replace />} />
             <Route path="/about" element={<Navigate to="/stocks" replace />} />

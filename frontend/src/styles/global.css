@@ -647,6 +647,15 @@ body {
 .score-breakdown { display: grid; gap: 8px; }
 .technical-indicators span { color: var(--text-secondary); }
 .horizon-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 16px 0 8px; }
+.watchlist-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 16px 0 8px; color: var(--text-secondary); font-size: 13px; }
+.watchlist-toolbar label { display: inline-flex; align-items: center; gap: 8px; color: var(--text-primary); }
+.watchlist-star.is-saved { color: var(--accent); }
+.symbol-search-results { margin-top: 12px; }
+.symbol-search-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+.symbol-search-row > div { min-width: 0; display: grid; gap: 4px; }
+.symbol-search-row span { color: var(--text-secondary); overflow-wrap: anywhere; }
+.watchlist-toolbar > a, .market-scanner .ant-table-placeholder a { color: var(--accent); }
+.market-scanner .ant-table-placeholder .ant-table-cell { color: var(--text-secondary); }
 .market-scanner .ant-table-thead > tr > th { color: var(--text-secondary); }
 .horizon-toolbar > span, .indicator-caption { color: var(--text-secondary); font-size: 12px; line-height: 1.6; }
 .technical-signal { display: inline-block; font-size: 12px; font-weight: 600; white-space: nowrap; }

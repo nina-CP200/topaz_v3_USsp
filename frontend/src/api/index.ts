@@ -66,6 +66,7 @@ export interface MoonAnalysis extends TechnicalSignal {
 }
 
 export interface StockResult {
+  analysis_date?: string
   moon_analysis?: MoonAnalysis
   technical_analysis?: TechnicalAnalysis
   symbol: string
@@ -339,5 +340,41 @@ export async function savePortfolio(holdings: HoldingItem[]): Promise<{ message:
 
 export async function analyzePortfolio(holdings: HoldingItem[]): Promise<PortfolioAnalysis> {
   const r = await api.post('/portfolio/analyze', { holdings })
+  return r.data
+}
+
+
+export interface Watchlist {
+  symbols: string[]
+}
+
+export async function getWatchlist(): Promise<Watchlist> {
+  const r = await api.get('/watchlist')
+  return r.data
+}
+
+export async function addToWatchlist(symbol: string): Promise<Watchlist> {
+  const r = await api.put(`/watchlist/${encodeURIComponent(symbol)}`)
+  return r.data
+}
+
+export async function removeFromWatchlist(symbol: string): Promise<Watchlist> {
+  const r = await api.delete(`/watchlist/${encodeURIComponent(symbol)}`)
+  return r.data
+}
+
+export interface SymbolSearchResult {
+  symbol: string
+  name: string
+  exchange: string
+}
+
+export async function searchWatchlistSymbols(query: string): Promise<{ results: SymbolSearchResult[]; warning?: string }> {
+  const r = await api.get('/watchlist/search', { params: { q: query }, timeout: 15000 })
+  return r.data
+}
+
+export async function getWatchlistAnalysis(): Promise<{ results: StockResult[]; failed: string[] }> {
+  const r = await api.get('/watchlist/analysis', { timeout: 60000 })
   return r.data
 }

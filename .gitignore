@@ -107,3 +107,6 @@ A股关注股票列表.md
 csi300_stock_list.csv
 csi300_stock_list.md
 csi300_components.xls
+
+# Local watchlist
+/data/raw/watchlist.json
